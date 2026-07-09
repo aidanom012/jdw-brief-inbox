@@ -33,7 +33,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6">
         <div className="animate-rise flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="pixel-label">Campaign briefs</p>

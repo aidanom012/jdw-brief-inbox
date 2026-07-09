@@ -10,7 +10,7 @@ export default function NewBriefPage() {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6">
         <div className="mb-6 animate-rise">
           <p className="pixel-label">8-bit campaign builder</p>
           <h1 className="mt-2 text-4xl font-black tracking-tight">New brief</h1>

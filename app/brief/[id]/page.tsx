@@ -48,7 +48,7 @@ export default async function BriefPage({ params }: BriefPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6">
         {errorMessage ? (
           <section className="pixel-alert p-4">
             {errorMessage}

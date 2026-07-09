@@ -25,6 +25,6 @@ export function defaultStatusForBrief(_brief: JDWCampaignBrief, _missingFields: 
 
 export function statusBadgeClass(status: BriefStatus): string {
   return status === "done"
-    ? "border-[#071013] bg-[#071013] text-[#dfe0e2]"
-    : "border-[#071013] bg-[#f7f8f8] text-[#071013]";
+    ? "border-black bg-black text-white"
+    : "border-black bg-white text-black";
 }

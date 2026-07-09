@@ -12,8 +12,9 @@ type StatusControlProps = {
 export function StatusControl({ briefId, status }: StatusControlProps) {
   const [currentStatus, setCurrentStatus] = useState(status);
   const [isPending, startTransition] = useTransition();
+  const nextStatus: BriefStatus = currentStatus === "done" ? "received" : "done";
 
-  function update(nextStatus: BriefStatus) {
+  function update() {
     setCurrentStatus(nextStatus);
     startTransition(async () => {
       await updateBriefStatusAction(briefId, nextStatus);
@@ -21,21 +22,16 @@ export function StatusControl({ briefId, status }: StatusControlProps) {
   }
 
   return (
-    <div>
-      <span className="pixel-label block">Archive state</span>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {(["received", "done"] as BriefStatus[]).map((option) => (
-          <button
-            key={option}
-            type="button"
-            disabled={isPending || currentStatus === option}
-            onClick={() => update(option)}
-            className={`mini-button focus-ring px-4 py-3 disabled:cursor-not-allowed ${currentStatus === option ? "safe" : ""}`}
-          >
-            {STATUS_LABELS[option]}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="pixel-flow-chip">{STATUS_LABELS[currentStatus]}</span>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={update}
+        className={`mini-button focus-ring px-4 py-3 disabled:cursor-not-allowed ${nextStatus === "done" ? "safe" : ""}`}
+      >
+        {isPending ? "Saving..." : nextStatus === "done" ? "Mark completed" : "Back to draft"}
+      </button>
     </div>
   );
 }

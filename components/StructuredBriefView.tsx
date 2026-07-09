@@ -13,7 +13,7 @@ function SnapshotStep({ index, label, value }: { index: number; label: string; v
   return (
     <div className="meta-snapshot pixel-card p-4">
       <div className="flex items-start gap-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center border-4 border-black bg-[#071013] font-mono text-xs font-black text-[#dfe0e2]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center border-4 border-black bg-black font-mono text-xs font-black text-white">
           {String(index).padStart(2, "0")}
         </span>
         <div>
@@ -95,7 +95,7 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
           <summary className="cursor-pointer font-mono text-sm font-black uppercase tracking-[0.16em]">Notes ({notes.length})</summary>
           <div className="mt-3 grid gap-2 text-sm font-semibold">
             {notes.map((note, index) => (
-              <p key={`${note}-${index}`} className="whitespace-pre-wrap border-4 border-black bg-[#dfe0e2] p-3">{note}</p>
+              <p key={`${note}-${index}`} className="whitespace-pre-wrap border-4 border-black bg-white p-3">{note}</p>
             ))}
           </div>
         </details>

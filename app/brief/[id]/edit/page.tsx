@@ -24,7 +24,7 @@ export default async function EditBriefPage({ params }: EditBriefPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="pixel-label">Edit saved brief</p>
