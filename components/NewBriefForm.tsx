@@ -1,10 +1,13 @@
 "use client";
 
+import type { ChangeEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitBriefAction } from "@/app/actions";
 import { validateBriefJson, type BriefValidationResult } from "@/lib/brief-schema";
 import { STATUS_LABELS } from "@/lib/status";
+
+const MAX_JSON_FILE_LENGTH = 250_000;
 
 const SAMPLE_BRIEF = `{
   "brief_version": "JDW_CAMPAIGN_BRIEF_V1",
@@ -69,8 +72,8 @@ export function NewBriefForm() {
 
   const parsedPreview = useMemo(() => {
     if (!validation?.ok) {
-    return null;
-  }
+      return null;
+    }
 
     return validation.briefs;
   }, [validation]);
@@ -80,6 +83,33 @@ export function NewBriefForm() {
     setValidation(nextValidation);
     setSubmitError(null);
     return nextValidation;
+  }
+
+  async function importJsonFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size > MAX_JSON_FILE_LENGTH) {
+      setSubmitError("JSON file is too large.");
+      setValidation(null);
+      return;
+    }
+
+    try {
+      const importedJson = await file.text();
+      const nextValidation = validateBriefJson(importedJson);
+
+      setRawJson(importedJson);
+      setValidation(nextValidation);
+      setSubmitError(null);
+    } catch {
+      setSubmitError("Unable to read that JSON file.");
+      setValidation(null);
+    }
   }
 
   function submitBrief() {
@@ -114,6 +144,10 @@ export function NewBriefForm() {
         />
       </label>
       <div className="flex flex-wrap items-center gap-3">
+        <label className="focus-ring cursor-pointer rounded-md border border-white/10 px-4 py-3 font-semibold text-white hover:bg-white/10">
+          Import JSON File
+          <input type="file" accept=".json,application/json" className="sr-only" onChange={importJsonFile} />
+        </label>
         <button
           type="button"
           onClick={validateCurrentBrief}

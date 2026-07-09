@@ -43,6 +43,14 @@ function titleForBrief(brief: JDWCampaignBrief): string {
   return release ? `${artist} - ${release}` : artist;
 }
 
+function missingInfoNotes(missingFields: string[]): string {
+  if (missingFields.length === 0) {
+    return "";
+  }
+
+  return ["Missing info to fill later:", ...missingFields.map((field) => `- ${field}:`)].join("\n");
+}
+
 function mapBriefRow(row: Record<string, unknown>): BriefRow {
   return {
     id: String(row.id),
@@ -135,6 +143,7 @@ export async function createBrief(params: {
       objective: brief.campaign.objective,
       raw_json: brief,
       missing_required_fields: missingFields,
+      internal_notes: missingInfoNotes(missingFields),
       submitted_by: submittedBy
     })
     .select("*")

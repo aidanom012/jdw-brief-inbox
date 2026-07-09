@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export type UserRole = "aidan" | "james";
 
 const COOKIE_NAME = "jdw_brief_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 function authSecret(): string {
   return (
@@ -82,12 +82,19 @@ export function setSessionRole(role: UserRole): void {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: COOKIE_MAX_AGE,
+    priority: "high",
     path: "/"
   });
 }
 
 export function clearSessionRole(): void {
-  cookies().delete(COOKIE_NAME);
+  cookies().set(COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+    path: "/"
+  });
 }
 
 export function roleFromPasscode(passcode: string): UserRole | null {
