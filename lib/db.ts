@@ -2,7 +2,7 @@ import { DEFAULT_CHECKLIST_ITEMS } from "@/lib/checklist";
 import type { JDWCampaignBrief } from "@/lib/brief-schema";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { BriefStatus } from "@/lib/status";
-import { defaultStatusForMissingFields } from "@/lib/status";
+import { defaultStatusForBrief } from "@/lib/status";
 import type { UserRole } from "@/lib/auth";
 
 export type BriefRow = {
@@ -128,7 +128,7 @@ export async function createBrief(params: {
 }): Promise<BriefRow> {
   const supabase = getSupabaseAdmin();
   const { brief, missingFields, submittedBy } = params;
-  const status = defaultStatusForMissingFields(missingFields);
+  const status = defaultStatusForBrief(missingFields, brief.build);
 
   const { data, error } = await supabase
     .from("briefs")

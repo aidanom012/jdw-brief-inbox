@@ -22,8 +22,33 @@ export function isBriefStatus(value: string): value is BriefStatus {
   return BRIEF_STATUSES.includes(value as BriefStatus);
 }
 
+type BriefBuildContext = {
+  action?: string | null;
+  approval_required?: boolean | null;
+  priority?: string | null;
+} | null | undefined;
+
 export function defaultStatusForMissingFields(missingFields: string[]): BriefStatus {
   return missingFields.length > 0 ? "incomplete" : "ready_to_build";
+}
+
+export function defaultStatusForBrief(
+  missingFields: string[],
+  build?: BriefBuildContext
+): BriefStatus {
+  if (missingFields.length > 0) {
+    return "incomplete";
+  }
+
+  if (
+    build?.approval_required === true ||
+    build?.priority === "hold" ||
+    build?.action === "hold"
+  ) {
+    return "needs_james";
+  }
+
+  return "ready_to_build";
 }
 
 export function statusBadgeClass(status: BriefStatus): string {

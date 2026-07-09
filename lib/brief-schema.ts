@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defaultStatusForMissingFields } from "@/lib/status";
+import { defaultStatusForBrief } from "@/lib/status";
 
 const nullableString = z.string().nullable();
 const nullableNumber = z.number().finite().nullable();
@@ -14,7 +14,9 @@ const targetingTypeSchema = z
   .enum(["broad", "interest", "lookalike", "retargeting", "advantage_plus", "unknown"])
   .nullable();
 const assetTypeSchema = z.enum(["video", "image", "carousel", "spark_ad", "unknown"]).nullable();
-const adSetBudgetTypeSchema = z.enum(["daily", "lifetime", "unknown"]).nullable();
+const adSetBudgetTypeSchema = z
+  .enum(["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"])
+  .nullable();
 const sourceTypeSchema = z
   .enum(["email", "handover", "paid_media_brief", "report", "quick_note", "unknown"])
   .nullable();
@@ -129,7 +131,7 @@ export type JDWCampaignBrief = z.infer<typeof campaignBriefSchema>;
 export type ValidatedBrief = {
   brief: JDWCampaignBrief;
   missingFields: string[];
-  defaultStatus: ReturnType<typeof defaultStatusForMissingFields>;
+  defaultStatus: ReturnType<typeof defaultStatusForBrief>;
 };
 
 export type BriefValidationResult =
@@ -246,7 +248,7 @@ function validatedBrief(brief: JDWCampaignBrief): ValidatedBrief {
   return {
     brief,
     missingFields,
-    defaultStatus: defaultStatusForMissingFields(missingFields)
+    defaultStatus: defaultStatusForBrief(missingFields, brief.build)
   };
 }
 

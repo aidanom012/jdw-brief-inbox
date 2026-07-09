@@ -32,6 +32,7 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
 
   const dates = [brief.campaign.start_date, brief.campaign.end_date].filter(Boolean).join(" to ");
   const hasBuildContext = brief.source || brief.build;
+  const sourceNotes = brief.source?.source_notes ?? [];
 
   return (
     <section className="rounded-lg border border-white/10 bg-panel p-4">
@@ -67,9 +68,9 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
         <Field label="Territory" value={brief.campaign.territory_summary} />
         <Field label="ASID" value={brief.campaign.asid || null} />
       </dl>
-      {brief.budget.notes || brief.special_notes.length > 0 ? (
+      {sourceNotes.length > 0 || brief.budget.notes || brief.special_notes.length > 0 ? (
         <div className="mt-5 grid gap-3 text-sm text-zinc-300">
-          {brief.source?.source_notes.map((note) => (
+          {sourceNotes.map((note) => (
             <p key={note} className="rounded-md border border-white/10 bg-ink/70 p-3">
               Source: {note}
             </p>
