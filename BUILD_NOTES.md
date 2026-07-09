@@ -1,24 +1,23 @@
-# JDW Brief Builder 8-bit rethink
+# JDW Brief Builder pixel-simple rethink
 
 Built changes:
 
-- Reworked `/new` into a 3-step manual brief builder.
-- Step 1: Campaign setup fields: artist, release, platform, account, ACID, ASID, objective, campaign type, conversion location, optimisation event, pixel, budget, dates, territory, notes.
-- Step 2: Ad sets and ads with ads visually nested underneath their parent ad set.
-- Step 3: review, missing fields, status preview, and build checklist preview.
-- Claude JSON import is still available, but optional.
-- Removed role behaviour in practice: one passcode gives full access to all actions.
-- Existing `AIDAN_PASSCODE` / `JAMES_PASSCODE` still work as fallback, but `JDW_PASSCODE` is now the clean env var.
-- Added 8-bit / cyber command-centre styling, animated cards, neon buttons, pixel grid background.
-- Extended schema to support `campaign.campaign_notes`, `ad_sets[].notes`, and nested `ad_sets[].ads`.
-- Brief detail page now displays nested ads underneath each ad set.
-- Hold / approval briefs default to Needs James when complete.
+- Simplified the builder so it is much less overwhelming.
+- One passcode login only, full access once authenticated.
+- Removed ASID from the visible UI. The app only asks for ACID.
+- Step 1 keeps useful campaign-level details but arranged as the known setup only.
+- Step 2 is now simple: set how many ad sets, write what each ad set does/targets, optionally tick ad set budget, then add ads underneath.
+- Ads only ask for ad/asset name, asset type, destination link, asset links/post URLs/boost codes, copy, and a tiny note.
+- Kept optional Claude JSON import.
+- Reworked the look toward a proper 8-bit menu/window style: cream/yellow pixel panels, black chunky borders, square UI, pixel shadows, scanlines/grid, and snappier transitions.
+- Existing Supabase structure still works; data is saved inside raw_json.
 
-Tested:
+Manual apply:
 
-- `npm run typecheck` passes.
-- `NEXT_TELEMETRY_DISABLED=1 npm run build` completes successfully.
+Use the copy-into-repo zip. Drag the contents of `files/` into your repo and choose Replace/Merge.
 
-Important:
+Vercel env:
 
-- Do not upload `.env.local` to GitHub. Use Vercel environment variables instead.
+JDW_PASSCODE=your-one-passcode
+
+Keep your Supabase env vars as they are.

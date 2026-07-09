@@ -5,25 +5,21 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitBriefAction } from "@/app/actions";
 import { validateBriefJson, type BriefValidationResult } from "@/lib/brief-schema";
-import { STATUS_LABELS } from "@/lib/status";
 
 const MAX_JSON_FILE_LENGTH = 250_000;
 
+// The form stays deliberately simple. The JSON still keeps the full data shape,
+// but James/Aidan only have to fill the things that matter for building.
 type Platform = "" | "Meta" | "TikTok" | "YouTube" | "Other";
 type BudgetType = "" | "daily" | "lifetime" | "campaign_total" | "ad_set_level" | "unknown";
 type Currency = "" | "GBP" | "EUR" | "USD" | "AUD" | "CAD" | "unknown";
-type Gender = "all" | "male" | "female" | "unknown";
-type TargetingType = "broad" | "interest" | "lookalike" | "retargeting" | "advantage_plus" | "unknown";
 type AssetType = "" | "video" | "image" | "carousel" | "spark_ad" | "unknown";
 
 type WizardAd = {
   id: string;
   label: string;
-  release_title: string;
   asset_type: AssetType;
   asset_links: string;
-  post_url: string;
-  boost_code: string;
   destination_url: string;
   copy: string;
   notes: string;
@@ -32,17 +28,10 @@ type WizardAd = {
 type WizardAdSet = {
   id: string;
   label: string;
-  locations: string;
-  age_min: string;
-  age_max: string;
-  gender: Gender;
-  placements: string;
+  notes: string;
+  budget_enabled: boolean;
   budget_amount: string;
   budget_type: "" | "daily" | "lifetime" | "campaign_total" | "unknown";
-  targeting_type: TargetingType;
-  targeting_details: string;
-  exclusions: string;
-  notes: string;
   ads: WizardAd[];
 };
 
@@ -52,7 +41,6 @@ type CampaignSetup = {
   platform: Platform;
   account: string;
   acid: string;
-  asid: string;
   objective: string;
   campaign_type: string;
   conversion_location: string;
@@ -73,8 +61,6 @@ const PLATFORM_OPTIONS = ["Meta", "TikTok", "YouTube", "Other"] as const;
 const CURRENCY_OPTIONS = ["GBP", "EUR", "USD", "AUD", "CAD", "unknown"] as const;
 const BUDGET_OPTIONS = ["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"] as const;
 const AD_SET_BUDGET_OPTIONS = ["daily", "lifetime", "campaign_total", "unknown"] as const;
-const TARGETING_OPTIONS = ["broad", "interest", "lookalike", "retargeting", "advantage_plus", "unknown"] as const;
-const GENDER_OPTIONS = ["all", "male", "female", "unknown"] as const;
 const ASSET_OPTIONS = ["video", "image", "carousel", "spark_ad", "unknown"] as const;
 
 const OBJECTIVE_PRESETS = [
@@ -90,11 +76,11 @@ const OBJECTIVE_PRESETS = [
 const CAMPAIGN_TYPE_PRESETS = ["Engagement", "Sales", "Traffic", "Video Views", "Boost", "Awareness", "Other"];
 const CONVERSION_LOCATION_PRESETS = ["Website", "Instagram profile", "TikTok profile", "App", "None", "Unknown"];
 const OPTIMISATION_PRESETS = ["ViewContent", "FeatureFM_click", "Purchase", "Landing Page View", "ThruPlay", "15-sec engaged view", "Unknown"];
-const PLACEMENT_PRESETS = ["Instagram", "Facebook", "Instagram, Facebook", "TikTok", "YouTube", "Manual notes"];
+
 const STEPS = [
-  { number: 1, label: "Campaign setup", sub: "known details" },
-  { number: 2, label: "Ad sets + ads", sub: "nested build" },
-  { number: 3, label: "Review", sub: "missing + checklist" }
+  { number: 1, label: "Campaign", sub: "known stuff" },
+  { number: 2, label: "Ad sets", sub: "notes + ads" },
+  { number: 3, label: "Review", sub: "missing bits" }
 ] as const;
 
 function uid(prefix: string): string {
@@ -128,11 +114,8 @@ function newAd(label = ""): WizardAd {
   return {
     id: uid("ad"),
     label,
-    release_title: "",
     asset_type: "video",
     asset_links: "",
-    post_url: "",
-    boost_code: "",
     destination_url: "",
     copy: "",
     notes: ""
@@ -143,18 +126,11 @@ function newAdSet(label = ""): WizardAdSet {
   return {
     id: uid("adset"),
     label,
-    locations: "",
-    age_min: "",
-    age_max: "",
-    gender: "all",
-    placements: "Instagram",
+    notes: "",
+    budget_enabled: false,
     budget_amount: "",
     budget_type: "",
-    targeting_type: "unknown",
-    targeting_details: "",
-    exclusions: "",
-    notes: "",
-    ads: [newAd()]
+    ads: [newAd("Ad 1")]
   };
 }
 
@@ -164,7 +140,6 @@ const EMPTY_SETUP: CampaignSetup = {
   platform: "",
   account: "",
   acid: "",
-  asid: "",
   objective: "",
   campaign_type: "",
   conversion_location: "",
@@ -184,24 +159,24 @@ const EMPTY_SETUP: CampaignSetup = {
 function buildBrief(setup: CampaignSetup, adSets: WizardAdSet[]) {
   const nestedAdSets = adSets.map((adSet) => ({
     label: blankToNull(adSet.label),
-    locations: splitList(adSet.locations),
-    age_min: numberOrNull(adSet.age_min),
-    age_max: numberOrNull(adSet.age_max),
-    gender: adSet.gender,
-    placements: splitList(adSet.placements),
-    targeting_type: adSet.targeting_type,
-    targeting_details: blankToNull(adSet.targeting_details),
-    exclusions: blankToNull(adSet.exclusions),
-    budget_amount: numberOrNull(adSet.budget_amount),
-    budget_type: blankToEnum(adSet.budget_type),
+    locations: [],
+    age_min: null,
+    age_max: null,
+    gender: "all",
+    placements: [],
+    targeting_type: "unknown",
+    targeting_details: blankToNull(adSet.notes),
+    exclusions: null,
+    budget_amount: adSet.budget_enabled ? numberOrNull(adSet.budget_amount) : null,
+    budget_type: adSet.budget_enabled ? blankToEnum(adSet.budget_type) : null,
     notes: blankToNull(adSet.notes),
     ads: adSet.ads.map((ad) => ({
       label: blankToNull(ad.label),
-      release_title: blankToNull(ad.release_title),
+      release_title: blankToNull(ad.label || setup.release_title),
       asset_type: blankToEnum(ad.asset_type),
       asset_links: splitList(ad.asset_links),
-      post_url: blankToNull(ad.post_url),
-      boost_code: blankToNull(ad.boost_code),
+      post_url: null,
+      boost_code: null,
       destination_url: blankToNull(ad.destination_url),
       copy: blankToNull(ad.copy),
       notes: blankToNull(ad.notes)
@@ -230,7 +205,7 @@ function buildBrief(setup: CampaignSetup, adSets: WizardAdSet[]) {
       artist: blankToNull(setup.artist),
       release_title: blankToNull(setup.release_title),
       acid: blankToNull(setup.acid),
-      asid: blankToNull(setup.asid),
+      asid: null,
       platform: blankToEnum(setup.platform),
       account: blankToNull(setup.account),
       objective: blankToNull(setup.objective),
@@ -259,9 +234,9 @@ function buildBrief(setup: CampaignSetup, adSets: WizardAdSet[]) {
 function FieldShell({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400">{label}</span>
+      <span className="font-mono text-[10px] font-black uppercase tracking-[0.18em] text-[#6d5428]">{label}</span>
       <div className="mt-2">{children}</div>
-      {hint ? <span className="mt-1 block text-xs text-zinc-500">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-xs font-semibold text-[#806a42]">{hint}</span> : null}
     </label>
   );
 }
@@ -300,7 +275,7 @@ function JsonImportPanel({ onImported }: { onImported: (json: string, validation
       return;
     }
     onImported(value, validation);
-    setMessage("JSON validated. Submit it from the review step or keep using the manual builder.");
+    setMessage("JSON validated. Submit from review, or keep building manually.");
   }
 
   async function importJsonFile(event: ChangeEvent<HTMLInputElement>) {
@@ -317,13 +292,13 @@ function JsonImportPanel({ onImported }: { onImported: (json: string, validation
   }
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-black/20 p-4">
+    <section className="pixel-window p-4">
       <button type="button" onClick={() => setOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
         <span>
-          <span className="block font-mono text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Optional Claude import</span>
-          <span className="mt-1 block text-sm text-zinc-400">Paste JSON only if Claude already made one. The form builder is the main flow.</span>
+          <span className="block font-mono text-xs font-black uppercase tracking-[0.18em] text-[#33240d]">Optional Claude import</span>
+          <span className="mt-1 block text-sm font-medium text-[#6b593a]">Paste JSON only when Claude already made one. Manual builder is the main flow.</span>
         </span>
-        <span className="rounded-lg border border-white/10 px-3 py-2 font-mono text-xs text-zinc-300">{open ? "close" : "open"}</span>
+        <span className="mini-button">{open ? "close" : "open"}</span>
       </button>
       {open ? (
         <div className="mt-4 grid gap-3">
@@ -338,23 +313,33 @@ function JsonImportPanel({ onImported }: { onImported: (json: string, validation
             <button type="button" onClick={() => validateAndImport(rawJson)} className="pixel-button px-4 py-3 text-xs">
               Validate JSON
             </button>
-            <label className="focus-ring cursor-pointer rounded-xl border border-white/10 px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.14em] text-zinc-200 hover:bg-white/10">
+            <label className="mini-button cursor-pointer px-4 py-3">
               Import file
               <input type="file" accept=".json,application/json" className="sr-only" onChange={importJsonFile} />
             </label>
           </div>
-          {message ? <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">{message}</p> : null}
+          {message ? <p className="pixel-alert p-3 text-sm">{message}</p> : null}
         </div>
       ) : null}
     </section>
   );
 }
 
+function fitAdSetCount(current: WizardAdSet[], count: number): WizardAdSet[] {
+  const safeCount = Math.max(1, Math.min(24, count || 1));
+  if (safeCount === current.length) return current;
+  if (safeCount < current.length) return current.slice(0, safeCount);
+  return [
+    ...current,
+    ...Array.from({ length: safeCount - current.length }, (_, index) => newAdSet(`Ad set ${current.length + index + 1}`))
+  ];
+}
+
 export function NewBriefForm() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [setup, setSetup] = useState<CampaignSetup>(EMPTY_SETUP);
-  const [adSets, setAdSets] = useState<WizardAdSet[]>([newAdSet("Main ad set")]);
+  const [adSets, setAdSets] = useState<WizardAdSet[]>([newAdSet("Ad set 1")]);
   const [importedJson, setImportedJson] = useState<string | null>(null);
   const [importedValidation, setImportedValidation] = useState<BriefValidationResult | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -366,7 +351,6 @@ export function NewBriefForm() {
   const missingFields = activeValidation.ok
     ? activeValidation.briefs.reduce((fields, brief) => [...fields, ...brief.missingFields], [] as string[])
     : [];
-
   const activeJson = importedValidation?.ok && importedJson ? importedJson : manualJson;
 
   function updateSetup<K extends keyof CampaignSetup>(key: K, value: CampaignSetup[K]) {
@@ -420,34 +404,30 @@ export function NewBriefForm() {
 
   return (
     <div className="grid gap-5">
-      <div className="rounded-2xl border border-cyan-300/20 bg-panel/75 p-3 shadow-neon backdrop-blur-xl">
+      <div className="pixel-window p-3">
         <div className="grid gap-2 sm:grid-cols-3">
           {STEPS.map((item) => (
             <button
               key={item.number}
               type="button"
               onClick={() => setStep(item.number)}
-              className={`rounded-xl border px-4 py-3 text-left transition duration-200 ${
-                step === item.number
-                  ? "border-cyan-300/40 bg-cyan-300/15 text-white shadow-[0_0_24px_rgba(34,211,238,.12)]"
-                  : "border-white/10 bg-black/20 text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
-              }`}
+              className={`pixel-tab text-left ${step === item.number ? "pixel-tab-active" : ""}`}
             >
-              <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">0{item.number}</span>
-              <span className="mt-1 block font-semibold">{item.label}</span>
-              <span className="mt-1 block text-xs">{item.sub}</span>
+              <span className="font-mono text-xs font-black uppercase tracking-[0.18em]">0{item.number}</span>
+              <span className="mt-1 block text-lg font-black">{item.label}</span>
+              <span className="mt-1 block text-xs font-bold uppercase tracking-[0.12em]">{item.sub}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="animate-rise rounded-2xl border border-white/10 bg-panel/82 p-4 shadow-glow backdrop-blur-xl sm:p-6">
+      <div className="animate-rise pixel-window p-4 sm:p-6">
         {step === 1 ? (
           <section className="grid gap-5">
             <div>
-              <p className="font-mono text-xs font-bold uppercase tracking-[0.24em] text-cyan-200">Step 1</p>
-              <h2 className="mt-2 text-2xl font-black text-white">Campaign setup</h2>
-              <p className="mt-2 text-sm text-zinc-400">Fill what James knows. Blank fields stay blank and appear as missing info.</p>
+              <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-[#d34f1f]">Step 1</p>
+              <h2 className="mt-2 text-3xl font-black text-[#201203]">Campaign setup</h2>
+              <p className="mt-2 text-sm font-semibold text-[#6b593a]">Fill the known things. Anything blank stays blank and gets flagged.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -459,9 +439,8 @@ export function NewBriefForm() {
                   {PLATFORM_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </SelectInput>
               </FieldShell>
-              <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} placeholder="Atlantic Records UK" /></FieldShell>
+              <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} /></FieldShell>
               <FieldShell label="ACID"><TextInput value={setup.acid} onChange={(e) => updateSetup("acid", e.target.value)} /></FieldShell>
-              <FieldShell label="ASID"><TextInput value={setup.asid} onChange={(e) => updateSetup("asid", e.target.value)} /></FieldShell>
               <FieldShell label="Objective">
                 <TextInput list="objective-presets" value={setup.objective} onChange={(e) => updateSetup("objective", e.target.value)} />
                 <DataList id="objective-presets" options={OBJECTIVE_PRESETS} />
@@ -479,14 +458,13 @@ export function NewBriefForm() {
                 <DataList id="optimisation-presets" options={OPTIMISATION_PRESETS} />
               </FieldShell>
               <FieldShell label="Pixel"><TextInput value={setup.pixel} onChange={(e) => updateSetup("pixel", e.target.value)} /></FieldShell>
-              <FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / International / DACH" /></FieldShell>
+              <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} /></FieldShell>
               <FieldShell label="Budget type">
                 <SelectInput value={setup.budget_type} onChange={(e) => updateSetup("budget_type", e.target.value as BudgetType)}>
                   <option value="">Unknown</option>
                   {BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </SelectInput>
               </FieldShell>
-              <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} /></FieldShell>
               <FieldShell label="Currency">
                 <SelectInput value={setup.currency} onChange={(e) => updateSetup("currency", e.target.value as Currency)}>
                   <option value="">Unknown</option>
@@ -495,20 +473,18 @@ export function NewBriefForm() {
               </FieldShell>
               <FieldShell label="Start date"><TextInput type="date" value={setup.start_date} onChange={(e) => updateSetup("start_date", e.target.value)} /></FieldShell>
               <FieldShell label="End date"><TextInput type="date" value={setup.end_date} onChange={(e) => updateSetup("end_date", e.target.value)} /></FieldShell>
+              <div className="lg:col-span-3"><FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / FR, NL, BE / global" /></FieldShell></div>
+              <div className="lg:col-span-3"><FieldShell label="Campaign notes"><TextArea value={setup.campaign_notes} onChange={(e) => updateSetup("campaign_notes", e.target.value)} placeholder="Any weird instructions, same-as-previous notes, hold notes, etc." /></FieldShell></div>
             </div>
 
-            <FieldShell label="Campaign notes">
-              <TextArea value={setup.campaign_notes} onChange={(e) => updateSetup("campaign_notes", e.target.value)} placeholder="Same as previous, waiting on link, budget split notes, launch instructions..." />
-            </FieldShell>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
-                <input type="checkbox" checked={setup.approval_required} onChange={(e) => updateSetup("approval_required", e.target.checked)} className="h-5 w-5 rounded border-white/20 bg-ink text-cyan-300" />
-                <span><span className="block font-semibold text-white">Approval required</span><span className="text-sm text-zinc-400">Use when James/JD needs to sign off.</span></span>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="pixel-card flex items-center gap-3 p-4">
+                <input type="checkbox" checked={setup.approval_required} onChange={(e) => updateSetup("approval_required", e.target.checked)} className="h-5 w-5" />
+                <span><span className="block font-black text-[#201203]">Approval required</span><span className="text-sm font-semibold text-[#6b593a]">Use when James/JD needs to sign off.</span></span>
               </label>
-              <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
-                <input type="checkbox" checked={setup.hold_for_james} onChange={(e) => updateSetup("hold_for_james", e.target.checked)} className="h-5 w-5 rounded border-white/20 bg-ink text-cyan-300" />
-                <span><span className="block font-semibold text-white">Hold for James</span><span className="text-sm text-zinc-400">Defaults the brief to Needs James if complete.</span></span>
+              <label className="pixel-card flex items-center gap-3 p-4">
+                <input type="checkbox" checked={setup.hold_for_james} onChange={(e) => updateSetup("hold_for_james", e.target.checked)} className="h-5 w-5" />
+                <span><span className="block font-black text-[#201203]">Hold for James</span><span className="text-sm font-semibold text-[#6b593a]">Defaults the brief to Needs James.</span></span>
               </label>
             </div>
           </section>
@@ -518,95 +494,88 @@ export function NewBriefForm() {
           <section className="grid gap-5">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="font-mono text-xs font-bold uppercase tracking-[0.24em] text-cyan-200">Step 2</p>
-                <h2 className="mt-2 text-2xl font-black text-white">Ad sets + nested ads</h2>
-                <p className="mt-2 text-sm text-zinc-400">Each ad sits directly under its parent ad set, like Ads Manager.</p>
+                <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-[#d34f1f]">Step 2</p>
+                <h2 className="mt-2 text-3xl font-black text-[#201203]">Ad sets + ads</h2>
+                <p className="mt-2 text-sm font-semibold text-[#6b593a]">Keep it simple: how many ad sets, what each one does, budget if needed, then the ads underneath.</p>
               </div>
-              <button type="button" onClick={() => setAdSets((current) => [...current, newAdSet(`Ad set ${current.length + 1}`)])} className="pixel-button px-4 py-3 text-xs">
-                + Add ad set
-              </button>
+              <FieldShell label="How many ad sets?">
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={adSets.length}
+                  onChange={(event) => setAdSets((current) => fitAdSetCount(current, Number(event.target.value)))}
+                  className="max-w-32 text-center text-xl font-black"
+                />
+              </FieldShell>
             </div>
 
             <div className="grid gap-5">
               {adSets.map((adSet, adSetIndex) => (
-                <article key={adSet.id} className="rounded-2xl border border-cyan-300/15 bg-black/25 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.03)] sm:p-5">
+                <article key={adSet.id} className="pixel-card p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Ad set {adSetIndex + 1}</p>
-                      <h3 className="mt-1 text-xl font-black text-white">{adSet.label || "Untitled ad set"}</h3>
+                      <p className="font-mono text-xs font-black uppercase tracking-[0.18em] text-[#d34f1f]">Ad set {adSetIndex + 1}</p>
+                      <h3 className="mt-1 text-2xl font-black text-[#201203]">{adSet.label || `Ad set ${adSetIndex + 1}`}</h3>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => duplicateAdSet(adSet)} className="mini-button">Duplicate</button>
-                      <button type="button" onClick={() => setAdSets((current) => current.filter((item) => item.id !== adSet.id))} className="mini-button border-red-400/30 text-red-100">Delete</button>
+                      <button type="button" onClick={() => setAdSets((current) => current.filter((item) => item.id !== adSet.id))} className="mini-button danger">Delete</button>
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <FieldShell label="Label"><TextInput value={adSet.label} onChange={(e) => updateAdSet(adSet.id, { label: e.target.value })} /></FieldShell>
-                    <FieldShell label="Locations" hint="Comma or line separated"><TextInput value={adSet.locations} onChange={(e) => updateAdSet(adSet.id, { locations: e.target.value })} placeholder="UK, FR, DE" /></FieldShell>
-                    <FieldShell label="Placements" hint="Comma or line separated">
-                      <TextInput list="placement-presets" value={adSet.placements} onChange={(e) => updateAdSet(adSet.id, { placements: e.target.value })} />
-                      <DataList id="placement-presets" options={PLACEMENT_PRESETS} />
-                    </FieldShell>
-                    <FieldShell label="Age min"><TextInput inputMode="numeric" value={adSet.age_min} onChange={(e) => updateAdSet(adSet.id, { age_min: e.target.value })} /></FieldShell>
-                    <FieldShell label="Age max"><TextInput inputMode="numeric" value={adSet.age_max} onChange={(e) => updateAdSet(adSet.id, { age_max: e.target.value })} /></FieldShell>
-                    <FieldShell label="Gender">
-                      <SelectInput value={adSet.gender} onChange={(e) => updateAdSet(adSet.id, { gender: e.target.value as Gender })}>
-                        {GENDER_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                      </SelectInput>
-                    </FieldShell>
-                    <FieldShell label="Ad set budget"><TextInput inputMode="decimal" value={adSet.budget_amount} onChange={(e) => updateAdSet(adSet.id, { budget_amount: e.target.value })} /></FieldShell>
-                    <FieldShell label="Budget type">
-                      <SelectInput value={adSet.budget_type} onChange={(e) => updateAdSet(adSet.id, { budget_type: e.target.value as WizardAdSet["budget_type"] })}>
-                        <option value="">Campaign level / unknown</option>
-                        {AD_SET_BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                      </SelectInput>
-                    </FieldShell>
-                    <FieldShell label="Targeting type">
-                      <SelectInput value={adSet.targeting_type} onChange={(e) => updateAdSet(adSet.id, { targeting_type: e.target.value as TargetingType })}>
-                        {TARGETING_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                      </SelectInput>
-                    </FieldShell>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                    <FieldShell label="Ad set name"><TextInput value={adSet.label} onChange={(e) => updateAdSet(adSet.id, { label: e.target.value })} placeholder="UK prospecting / warm retargeting" /></FieldShell>
+                    <div className="lg:col-span-2"><FieldShell label="What does this ad set do / target?" hint="Put locations, age, placements, interest stack, LAL, retargeting notes here."><TextArea value={adSet.notes} onChange={(e) => updateAdSet(adSet.id, { notes: e.target.value })} placeholder="Example: UK only, IG placements, 18-35, Advantage+ off, Stormzy/Skepta stack..." /></FieldShell></div>
                   </div>
 
-                  <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    <div className="md:col-span-2"><FieldShell label="Targeting notes"><TextArea value={adSet.targeting_details} onChange={(e) => updateAdSet(adSet.id, { targeting_details: e.target.value })} placeholder="Stormzy, Skepta, no expansion, warm engagers..." /></FieldShell></div>
-                    <FieldShell label="Exclusions"><TextArea value={adSet.exclusions} onChange={(e) => updateAdSet(adSet.id, { exclusions: e.target.value })} /></FieldShell>
-                    <div className="md:col-span-3"><FieldShell label="Ad set notes"><TextArea value={adSet.notes} onChange={(e) => updateAdSet(adSet.id, { notes: e.target.value })} /></FieldShell></div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    <label className="pixel-card flex items-center gap-3 p-4">
+                      <input type="checkbox" checked={adSet.budget_enabled} onChange={(e) => updateAdSet(adSet.id, { budget_enabled: e.target.checked })} className="h-5 w-5" />
+                      <span><span className="block font-black text-[#201203]">Ad set budget?</span><span className="text-sm font-semibold text-[#6b593a]">Only tick if budget is split by ad set.</span></span>
+                    </label>
+                    {adSet.budget_enabled ? (
+                      <>
+                        <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={adSet.budget_amount} onChange={(e) => updateAdSet(adSet.id, { budget_amount: e.target.value })} /></FieldShell>
+                        <FieldShell label="Budget type">
+                          <SelectInput value={adSet.budget_type} onChange={(e) => updateAdSet(adSet.id, { budget_type: e.target.value as WizardAdSet["budget_type"] })}>
+                            <option value="">Unknown</option>
+                            {AD_SET_BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                          </SelectInput>
+                        </FieldShell>
+                      </>
+                    ) : null}
                   </div>
 
-                  <div className="mt-5 border-t border-white/10 pt-5">
+                  <div className="mt-6 border-t-4 border-[#201203] pt-5">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                      <h4 className="font-mono text-sm font-bold uppercase tracking-[0.18em] text-white">Ads inside this ad set</h4>
-                      <button type="button" onClick={() => updateAdSet(adSet.id, { ads: [...adSet.ads, newAd(`Ad ${adSet.ads.length + 1}`)] })} className="mini-button border-lime-300/30 text-lime-100">
+                      <h4 className="font-mono text-sm font-black uppercase tracking-[0.18em] text-[#201203]">Ads underneath</h4>
+                      <button type="button" onClick={() => updateAdSet(adSet.id, { ads: [...adSet.ads, newAd(`Ad ${adSet.ads.length + 1}`)] })} className="pixel-button px-4 py-3 text-xs">
                         + Add ad
                       </button>
                     </div>
                     <div className="grid gap-3">
                       {adSet.ads.map((ad, adIndex) => (
-                        <article key={ad.id} className="rounded-xl border border-white/10 bg-ink/65 p-4">
+                        <article key={ad.id} className="pixel-ad-card p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="font-semibold text-white">Ad {adIndex + 1}: {ad.label || "Untitled ad"}</p>
+                            <p className="font-black text-[#201203]">Ad {adIndex + 1}: {ad.label || "Untitled ad"}</p>
                             <div className="flex flex-wrap gap-2">
                               <button type="button" onClick={() => updateAdSet(adSet.id, { ads: [...adSet.ads, { ...ad, id: uid("ad"), label: `${ad.label || "Ad"} copy` }] })} className="mini-button">Duplicate</button>
-                              <button type="button" onClick={() => updateAdSet(adSet.id, { ads: adSet.ads.filter((item) => item.id !== ad.id) })} className="mini-button border-red-400/30 text-red-100">Delete</button>
+                              <button type="button" onClick={() => updateAdSet(adSet.id, { ads: adSet.ads.filter((item) => item.id !== ad.id) })} className="mini-button danger">Delete</button>
                             </div>
                           </div>
-                          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <FieldShell label="Ad label"><TextInput value={ad.label} onChange={(e) => updateAd(adSet.id, ad.id, { label: e.target.value })} /></FieldShell>
-                            <FieldShell label="Song / release"><TextInput value={ad.release_title} onChange={(e) => updateAd(adSet.id, ad.id, { release_title: e.target.value })} /></FieldShell>
+                          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                            <FieldShell label="Ad / asset name"><TextInput value={ad.label} onChange={(e) => updateAd(adSet.id, ad.id, { label: e.target.value })} placeholder="Geekin 9x16 / Spark code 1" /></FieldShell>
                             <FieldShell label="Asset type">
                               <SelectInput value={ad.asset_type} onChange={(e) => updateAd(adSet.id, ad.id, { asset_type: e.target.value as AssetType })}>
                                 <option value="">Unknown</option>
                                 {ASSET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                               </SelectInput>
                             </FieldShell>
-                            <FieldShell label="Destination URL"><TextInput value={ad.destination_url} onChange={(e) => updateAd(adSet.id, ad.id, { destination_url: e.target.value })} /></FieldShell>
-                            <FieldShell label="Post URL"><TextInput value={ad.post_url} onChange={(e) => updateAd(adSet.id, ad.id, { post_url: e.target.value })} /></FieldShell>
-                            <FieldShell label="Spark / boost code"><TextInput value={ad.boost_code} onChange={(e) => updateAd(adSet.id, ad.id, { boost_code: e.target.value })} /></FieldShell>
-                            <div className="lg:col-span-2"><FieldShell label="Asset links" hint="One per line, or comma separated"><TextArea value={ad.asset_links} onChange={(e) => updateAd(adSet.id, ad.id, { asset_links: e.target.value })} /></FieldShell></div>
-                            <FieldShell label="Copy"><TextArea value={ad.copy} onChange={(e) => updateAd(adSet.id, ad.id, { copy: e.target.value })} /></FieldShell>
-                            <div className="lg:col-span-3"><FieldShell label="Ad notes"><TextArea value={ad.notes} onChange={(e) => updateAd(adSet.id, ad.id, { notes: e.target.value })} /></FieldShell></div>
+                            <FieldShell label="Destination link"><TextInput value={ad.destination_url} onChange={(e) => updateAd(adSet.id, ad.id, { destination_url: e.target.value })} placeholder="song.so / Linkfire / post URL if needed" /></FieldShell>
+                            <div className="lg:col-span-2"><FieldShell label="Asset links / post URLs / boost codes" hint="One per line is easiest."><TextArea value={ad.asset_links} onChange={(e) => updateAd(adSet.id, ad.id, { asset_links: e.target.value })} /></FieldShell></div>
+                            <FieldShell label="Text / copy"><TextArea value={ad.copy} onChange={(e) => updateAd(adSet.id, ad.id, { copy: e.target.value })} /></FieldShell>
+                            <div className="lg:col-span-3"><FieldShell label="Tiny ad note"><TextInput value={ad.notes} onChange={(e) => updateAd(adSet.id, ad.id, { notes: e.target.value })} placeholder="Use the FR video too / pick 4x5 cut / A-B test" /></FieldShell></div>
                           </div>
                         </article>
                       ))}
@@ -621,78 +590,68 @@ export function NewBriefForm() {
         {step === 3 ? (
           <section className="grid gap-5">
             <div>
-              <p className="font-mono text-xs font-bold uppercase tracking-[0.24em] text-cyan-200">Step 3</p>
-              <h2 className="mt-2 text-2xl font-black text-white">Review + build checklist</h2>
-              <p className="mt-2 text-sm text-zinc-400">Check missing info before it goes into the inbox.</p>
+              <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-[#d34f1f]">Step 3</p>
+              <h2 className="mt-2 text-3xl font-black text-[#201203]">Review</h2>
+              <p className="mt-2 text-sm font-semibold text-[#6b593a]">Submit the brief, or jump back and fill the missing bits.</p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-4 lg:col-span-2">
-                <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Summary</p>
-                <h3 className="mt-2 text-2xl font-black text-white">{setup.artist || "Untitled artist"}</h3>
-                <p className="mt-1 text-zinc-300">{setup.release_title || "Untitled release"}</p>
-                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <p><span className="block text-zinc-500">Platform</span><span className="font-semibold text-zinc-100">{setup.platform || "Unknown"}</span></p>
-                  <p><span className="block text-zinc-500">Objective</span><span className="font-semibold text-zinc-100">{setup.objective || "Unknown"}</span></p>
-                  <p><span className="block text-zinc-500">Ad sets</span><span className="font-semibold text-zinc-100">{adSets.length}</span></p>
-                  <p><span className="block text-zinc-500">Ads</span><span className="font-semibold text-zinc-100">{adSets.reduce((count, adSet) => count + adSet.ads.length, 0)}</span></p>
-                </div>
-              </div>
-              <div className={`rounded-2xl border p-4 ${missingFields.length > 0 ? "border-red-400/30 bg-red-500/10" : "border-lime-300/30 bg-lime-300/10"}`}>
-                <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-zinc-400">Validation</p>
-                <p className="mt-2 text-3xl font-black text-white">{missingFields.length}</p>
-                <p className="text-sm text-zinc-300">missing required fields</p>
-                {activeValidation.ok ? (
-                  <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-zinc-300">
-                    Status after save: {STATUS_LABELS[activeValidation.briefs[0].defaultStatus]}
-                  </p>
-                ) : null}
-              </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="pixel-stat p-4"><span>Artist</span><strong>{setup.artist || "Unknown"}</strong></div>
+              <div className="pixel-stat p-4"><span>Platform</span><strong>{setup.platform || "Unknown"}</strong></div>
+              <div className="pixel-stat p-4"><span>Ad sets</span><strong>{adSets.length}</strong></div>
+              <div className="pixel-stat p-4"><span>Ads</span><strong>{adSets.reduce((total, adSet) => total + adSet.ads.length, 0)}</strong></div>
             </div>
 
-            {missingFields.length > 0 ? (
-              <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-4">
-                <h3 className="font-semibold text-red-100">Missing info</h3>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="pixel-card p-4">
+              <h3 className="font-mono text-sm font-black uppercase tracking-[0.18em] text-[#201203]">Missing info</h3>
+              {missingFields.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
                   {missingFields.map((field) => (
-                    <span key={field} className="rounded-lg border border-red-400/20 bg-black/20 px-3 py-2 font-mono text-xs text-red-100">{field}</span>
+                    <span key={field} className="pixel-missing px-3 py-2 font-mono text-xs font-black">{field}</span>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-lime-300/25 bg-lime-300/10 p-4 text-lime-100">Looks ready. Save it to the inbox and build from the checklist.</div>
-            )}
+              ) : (
+                <p className="mt-3 pixel-ready p-3 text-sm font-black">No missing required fields.</p>
+              )}
+            </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-              <h3 className="font-semibold text-white">Build checklist preview</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {["Confirm account", "Confirm budget", "Confirm pixel/event", "Build campaign", "Add ad sets", "Add ads under parent ad sets", "Check links/copy", "Send screenshot if unclear"].map((item) => (
-                  <span key={item} className="rounded-lg border border-white/10 bg-ink/60 px-3 py-2 text-sm text-zinc-200">□ {item}</span>
-                ))}
+            <div className="pixel-card p-4">
+              <h3 className="font-mono text-sm font-black uppercase tracking-[0.18em] text-[#201203]">Build checklist preview</h3>
+              <div className="mt-3 grid gap-2 text-sm font-bold text-[#33240d]">
+                <p>□ Confirm campaign setup, account, pixel and budget.</p>
+                <p>□ Build {adSets.length} ad set{adSets.length === 1 ? "" : "s"}.</p>
+                <p>□ Add ads underneath the correct parent ad set.</p>
+                <p>□ Check each asset link, destination link and copy line.</p>
+                <p>□ Screenshot/send to James if anything is missing or unclear.</p>
               </div>
             </div>
 
-            <JsonImportPanel onImported={(json, validation) => { setImportedJson(json); setImportedValidation(validation); }} />
+            <JsonImportPanel
+              onImported={(json, validation) => {
+                setImportedJson(json);
+                setImportedValidation(validation);
+              }}
+            />
 
-            {submitError ? <p className="rounded-xl border border-red-400/30 bg-red-500/12 p-4 text-red-100">{submitError}</p> : null}
+            {submitError ? <p className="pixel-alert p-3 text-sm font-bold">{submitError}</p> : null}
+
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <button type="button" onClick={() => setStep(2)} className="mini-button px-4 py-3">Back to ad sets</button>
-              <button type="button" onClick={submitBrief} disabled={isPending} className="pixel-button px-5 py-4 text-sm disabled:cursor-not-allowed disabled:opacity-50">
-                {isPending ? "Saving..." : "Save brief to inbox"}
+              <button type="button" onClick={() => setStep(2)} className="mini-button px-4 py-3">Back</button>
+              <button type="button" onClick={submitBrief} disabled={isPending} className="pixel-button px-6 py-4 text-sm disabled:opacity-60">
+                {isPending ? "Saving..." : importedJson ? "Submit imported JSON" : "Create brief"}
               </button>
             </div>
           </section>
         ) : null}
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3">
-        <button type="button" disabled={step === 1} onClick={() => setStep((current) => Math.max(1, current - 1))} className="mini-button px-4 py-3 disabled:cursor-not-allowed disabled:opacity-40">
-          Previous
-        </button>
-        <button type="button" disabled={step === 3} onClick={() => setStep((current) => Math.min(3, current + 1))} className="pixel-button px-4 py-3 text-xs disabled:cursor-not-allowed disabled:opacity-40">
-          Next step
-        </button>
-      </div>
+      {step < 3 ? (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setStep((current) => Math.min(3, current + 1))} className="pixel-button px-6 py-4 text-sm">
+            Next
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

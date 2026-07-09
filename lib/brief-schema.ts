@@ -222,10 +222,8 @@ export function computeMissingFields(brief: JDWCampaignBrief): string[] {
   const requiresVideoAssets = isVideoViewCampaign(brief);
 
   brief.ad_sets.forEach((adSet, index) => {
-    if (!isPresentArray(adSet.locations)) addMissing(missing, `ad_sets[${index}].locations`);
-    if (adSet.age_min === null) addMissing(missing, `ad_sets[${index}].age_min`);
-    if (adSet.age_max === null) addMissing(missing, `ad_sets[${index}].age_max`);
-    if (!isPresentArray(adSet.placements)) addMissing(missing, `ad_sets[${index}].placements`);
+    const hasTargetingOrNotes = isPresentString(adSet.targeting_details) || isPresentString(adSet.notes);
+    if (!hasTargetingOrNotes) addMissing(missing, `ad_sets[${index}].targeting_details`);
     if ((adSet.ads || []).length === 0 && (brief.ads || []).length === 0) addMissing(missing, `ad_sets[${index}].ads`);
   });
 

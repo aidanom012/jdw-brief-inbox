@@ -67,7 +67,6 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
         <Field label="Budget" value={budget || null} />
         <Field label="Dates" value={dates || null} />
         <Field label="Territory" value={brief.campaign.territory_summary} />
-        <Field label="ASID" value={brief.campaign.asid || null} />
       </dl>
       {notes.length > 0 ? (
         <div className="mt-5 grid gap-3 text-sm text-zinc-300">
