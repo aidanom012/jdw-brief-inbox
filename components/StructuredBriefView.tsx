@@ -31,10 +31,31 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
     .join(" / ");
 
   const dates = [brief.campaign.start_date, brief.campaign.end_date].filter(Boolean).join(" to ");
+  const hasBuildContext = brief.source || brief.build;
 
   return (
     <section className="rounded-lg border border-white/10 bg-panel p-4">
       <h2 className="text-lg font-semibold text-white">Campaign setup</h2>
+      {hasBuildContext ? (
+        <dl className="mt-4 grid grid-cols-1 gap-4 rounded-md border border-white/10 bg-ink/70 p-4 md:grid-cols-2 lg:grid-cols-3">
+          <Field label="Source" value={brief.source?.source_type || null} />
+          <Field label="Source title" value={brief.source?.source_title || null} />
+          <Field label="Source date" value={brief.source?.source_date || null} />
+          <Field label="Build action" value={brief.build?.action || null} />
+          <Field label="Existing campaign" value={brief.build?.existing_campaign_name || null} />
+          <Field label="Priority" value={brief.build?.priority || null} />
+          <Field
+            label="Approval required"
+            value={brief.build?.approval_required === null || brief.build?.approval_required === undefined
+              ? null
+              : brief.build.approval_required
+                ? "Yes"
+                : "No"}
+          />
+          <Field label="Launch instruction" value={brief.build?.launch_instruction || null} />
+          <Field label="Original item" value={brief.source?.original_item_label || null} />
+        </dl>
+      ) : null}
       <dl className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Field label="Campaign objective" value={brief.campaign.objective} />
         <Field label="Campaign type" value={brief.campaign.campaign_type} />
@@ -48,6 +69,11 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
       </dl>
       {brief.budget.notes || brief.special_notes.length > 0 ? (
         <div className="mt-5 grid gap-3 text-sm text-zinc-300">
+          {brief.source?.source_notes.map((note) => (
+            <p key={note} className="rounded-md border border-white/10 bg-ink/70 p-3">
+              Source: {note}
+            </p>
+          ))}
           {brief.budget.notes ? (
             <p className="rounded-md border border-white/10 bg-ink/70 p-3">{brief.budget.notes}</p>
           ) : null}

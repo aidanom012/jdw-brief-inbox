@@ -23,6 +23,7 @@ export type SubmitBriefResult =
   | {
       ok: true;
       id: string;
+      ids: string[];
     }
   | {
       ok: false;
@@ -52,17 +53,24 @@ export async function submitBriefAction(rawJson: string): Promise<SubmitBriefRes
   }
 
   try {
-    const brief = await createBrief({
-      brief: validation.brief,
-      missingFields: validation.missingFields,
-      submittedBy: role
-    });
+    const savedBriefs = [];
+
+    for (const validatedBrief of validation.briefs) {
+      const brief = await createBrief({
+        brief: validatedBrief.brief,
+        missingFields: validatedBrief.missingFields,
+        submittedBy: role
+      });
+
+      savedBriefs.push(brief);
+    }
 
     revalidatePath("/inbox");
 
     return {
       ok: true,
-      id: brief.id
+      id: savedBriefs[0].id,
+      ids: savedBriefs.map((brief) => brief.id)
     };
   } catch (error) {
     return {

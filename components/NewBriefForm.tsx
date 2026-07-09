@@ -69,10 +69,10 @@ export function NewBriefForm() {
 
   const parsedPreview = useMemo(() => {
     if (!validation?.ok) {
-      return null;
-    }
+    return null;
+  }
 
-    return validation.brief;
+    return validation.briefs;
   }, [validation]);
 
   function validateCurrentBrief(): BriefValidationResult {
@@ -97,7 +97,7 @@ export function NewBriefForm() {
         return;
       }
 
-      router.push(`/brief/${result.id}`);
+      router.push(result.ids.length === 1 ? `/brief/${result.id}` : "/inbox");
     });
   }
 
@@ -144,33 +144,55 @@ export function NewBriefForm() {
 
       {validation ? (
         validation.ok ? (
+          (() => {
+            const missingCount = validation.briefs.reduce((total, brief) => total + brief.missingFields.length, 0);
+
+            return (
           <section
             className={`rounded-lg border p-4 ${
-              validation.missingFields.length > 0
+              missingCount > 0
                 ? "border-red-400/30 bg-red-500/10"
                 : "border-emerald-400/30 bg-emerald-500/10"
             }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-white">
-                {validation.missingFields.length > 0 ? "Brief incomplete" : "Brief valid"}
+                {missingCount > 0 ? "Brief incomplete" : "Brief valid"}
               </h2>
               <span className="rounded-full border border-white/10 px-3 py-1 text-sm text-zinc-100">
-                Default status: {STATUS_LABELS[validation.defaultStatus]}
+                {validation.briefs.length === 1
+                  ? `Default status: ${STATUS_LABELS[validation.briefs[0].defaultStatus]}`
+                  : `${validation.briefs.length} briefs ready to submit`}
               </span>
             </div>
-            {validation.missingFields.length > 0 ? (
-              <ul className="mt-4 grid gap-2 text-sm text-red-100 sm:grid-cols-2">
-                {validation.missingFields.map((field) => (
-                  <li key={field} className="rounded-md border border-red-300/20 bg-red-950/30 px-3 py-2 font-mono">
-                    {field}
-                  </li>
-                ))}
-              </ul>
+            {missingCount > 0 ? (
+              <div className="mt-4 grid gap-3">
+                {validation.briefs.map((validatedBrief, index) =>
+                  validatedBrief.missingFields.length > 0 ? (
+                    <div key={`${validatedBrief.brief.campaign.artist}-${index}`}>
+                      <p className="text-sm font-semibold text-red-50">
+                        Brief {index + 1}: {validatedBrief.brief.campaign.artist || "Unknown artist"}
+                      </p>
+                      <ul className="mt-2 grid gap-2 text-sm text-red-100 sm:grid-cols-2">
+                        {validatedBrief.missingFields.map((field) => (
+                          <li
+                            key={`${index}-${field}`}
+                            className="rounded-md border border-red-300/20 bg-red-950/30 px-3 py-2 font-mono"
+                          >
+                            {field}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null
+                )}
+              </div>
             ) : (
               <p className="mt-3 text-sm text-emerald-100">No missing required fields found.</p>
             )}
           </section>
+            );
+          })()
         ) : (
           <section className="rounded-lg border border-red-400/30 bg-red-500/10 p-4">
             <h2 className="text-lg font-semibold text-red-50">{validation.message}</h2>
@@ -194,32 +216,41 @@ export function NewBriefForm() {
       {parsedPreview ? (
         <section className="rounded-lg border border-white/10 bg-panel p-4">
           <h2 className="text-lg font-semibold text-white">Parsed preview</h2>
-          <dl className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <dt className="text-zinc-500">Artist</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.artist || "Unknown"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Song / release</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.release_title || "Unknown"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Platform</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.platform || "Unknown"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Account</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.account || "Unknown"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Objective</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.objective || "Unknown"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">ACID</dt>
-              <dd className="font-medium text-zinc-100">{parsedPreview.campaign.acid || "Unknown"}</dd>
-            </div>
-          </dl>
+          <div className="mt-4 grid gap-3">
+            {parsedPreview.map(({ brief }, index) => (
+              <article key={`${brief.campaign.artist}-${index}`} className="rounded-md border border-white/10 bg-ink/70 p-3">
+                <p className="text-sm font-semibold text-zinc-100">
+                  Brief {index + 1}: {brief.campaign.artist || "Unknown artist"}
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-4 text-sm md:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <dt className="text-zinc-500">Song / release</dt>
+                    <dd className="font-medium text-zinc-100">{brief.campaign.release_title || "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Platform</dt>
+                    <dd className="font-medium text-zinc-100">{brief.campaign.platform || "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Account</dt>
+                    <dd className="font-medium text-zinc-100">{brief.campaign.account || "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Objective</dt>
+                    <dd className="font-medium text-zinc-100">{brief.campaign.objective || "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">ACID</dt>
+                    <dd className="font-medium text-zinc-100">{brief.campaign.acid || "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Action</dt>
+                    <dd className="font-medium text-zinc-100">{brief.build?.action || "Unknown"}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
           <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-white/10 bg-ink p-4 text-xs leading-6 text-zinc-300">
             {JSON.stringify(parsedPreview, null, 2)}
           </pre>

@@ -42,6 +42,14 @@ export function AdsTable({ ads }: AdsTableProps) {
                   </dd>
                 </div>
                 <div>
+                  <dt className="text-zinc-500">Post URL</dt>
+                  <dd className="break-words text-zinc-100">{valueText(ad.post_url)}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Boost code</dt>
+                  <dd className="break-words font-mono text-xs text-zinc-100">{valueText(ad.boost_code)}</dd>
+                </div>
+                <div>
                   <dt className="text-zinc-500">Copy</dt>
                   <dd className="whitespace-pre-wrap text-zinc-100">{valueText(ad.copy)}</dd>
                 </div>
