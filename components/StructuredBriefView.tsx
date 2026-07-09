@@ -9,20 +9,64 @@ function valueText(value: string | number | null | undefined): string {
   return String(value);
 }
 
-function Tile({ label, value }: { label: string; value: string | number | null | undefined }) {
+function SnapshotStep({ index, label, value }: { index: number; label: string; value: string | number | null | undefined }) {
   return (
-    <div className="pixel-panel p-3">
-      <dt className="pixel-label">{label}</dt>
-      <dd className="mt-1 font-black">{valueText(value)}</dd>
+    <div className="meta-snapshot pixel-card p-4">
+      <div className="flex items-start gap-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center border-4 border-black bg-[#071013] font-mono text-xs font-black text-[#dfe0e2]">
+          {String(index).padStart(2, "0")}
+        </span>
+        <div>
+          <dt className="pixel-label">{label}</dt>
+          <dd className="mt-1 text-lg font-black leading-tight">{valueText(value)}</dd>
+        </div>
+      </div>
     </div>
   );
 }
 
+function metaSteps(brief: JDWCampaignBrief) {
+  return [
+    ["Platform", brief.campaign.platform],
+    ["Account", brief.campaign.account],
+    ["Campaign objective", brief.campaign.objective],
+    ["Campaign type", brief.campaign.campaign_type],
+    ["Conversion location", brief.campaign.conversion_location],
+    ["Pixel", brief.campaign.pixel],
+    ["Optimisation event", brief.campaign.optimisation_event],
+    ["Budget", [brief.budget.amount, brief.budget.currency, brief.budget.type].filter(Boolean).join(" / ") || null],
+    ["Territory", brief.campaign.territory_summary],
+    ["Dates", [brief.campaign.start_date, brief.campaign.end_date].filter(Boolean).join(" to ") || null]
+  ] as const;
+}
+
+function tiktokSteps(brief: JDWCampaignBrief) {
+  return [
+    ["Platform", brief.campaign.platform],
+    ["Account", brief.campaign.account],
+    ["ACID", brief.campaign.acid],
+    ["Objective", brief.campaign.objective],
+    ["Optimisation", brief.campaign.optimisation_event || "Spark / video view setup"],
+    ["Budget", [brief.budget.amount, brief.budget.currency, brief.budget.type].filter(Boolean).join(" / ") || null],
+    ["Territory", brief.campaign.territory_summary],
+    ["Dates", [brief.campaign.start_date, brief.campaign.end_date].filter(Boolean).join(" to ") || null]
+  ] as const;
+}
+
+function genericSteps(brief: JDWCampaignBrief) {
+  return [
+    ["Platform", brief.campaign.platform],
+    ["Account", brief.campaign.account],
+    ["ACID", brief.campaign.acid],
+    ["Objective", brief.campaign.objective],
+    ["Budget", [brief.budget.amount, brief.budget.currency, brief.budget.type].filter(Boolean).join(" / ") || null],
+    ["Territory", brief.campaign.territory_summary]
+  ] as const;
+}
+
 export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
-  const budget = [brief.budget.amount === null ? null : brief.budget.amount, brief.budget.currency, brief.budget.type]
-    .filter(Boolean)
-    .join(" / ");
-  const dates = [brief.campaign.start_date, brief.campaign.end_date].filter(Boolean).join(" to ");
+  const platform = brief.campaign.platform;
+  const steps = platform === "Meta" ? metaSteps(brief) : platform === "TikTok" ? tiktokSteps(brief) : genericSteps(brief);
   const notes = [
     ...(brief.source?.source_notes ?? []),
     brief.campaign.campaign_notes || null,
@@ -32,30 +76,26 @@ export function StructuredBriefView({ brief }: StructuredBriefViewProps) {
 
   return (
     <section className="pixel-window p-4 sm:p-6">
-      <div>
-        <p className="pixel-label">Campaign card</p>
-        <h2 className="mt-2 text-3xl font-black">Setup snapshot</h2>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="pixel-label">Setup snapshot</p>
+          <h2 className="mt-2 text-3xl font-black">{platform === "TikTok" ? "TikTok build order" : platform === "Meta" ? "Meta build order" : "Campaign build order"}</h2>
+          <p className="mt-1 text-sm font-semibold pixel-muted">Cascaded like Ads Manager: the important setup bits first, details only when needed.</p>
+        </div>
       </div>
-      <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Platform" value={brief.campaign.platform} />
-        <Tile label="Account" value={brief.campaign.account} />
-        <Tile label="ACID" value={brief.campaign.acid} />
-        <Tile label="Objective" value={brief.campaign.objective} />
-        <Tile label="Type" value={brief.campaign.campaign_type} />
-        <Tile label="Event" value={brief.campaign.optimisation_event} />
-        <Tile label="Pixel" value={brief.campaign.pixel} />
-        <Tile label="Budget" value={budget || null} />
-        <Tile label="Dates" value={dates || null} />
-        <Tile label="Territory" value={brief.campaign.territory_summary} />
-        <Tile label="Conversion" value={brief.campaign.conversion_location} />
-        <Tile label="Source" value={brief.source?.source_title || brief.source?.source_type || null} />
+
+      <dl className="mt-5 max-w-3xl">
+        {steps.map(([label, value], index) => (
+          <SnapshotStep key={label} index={index + 1} label={label} value={value} />
+        ))}
       </dl>
+
       {notes.length > 0 ? (
-        <details className="mt-5 pixel-card p-4">
+        <details className="mt-6 pixel-card p-4">
           <summary className="cursor-pointer font-mono text-sm font-black uppercase tracking-[0.16em]">Notes ({notes.length})</summary>
           <div className="mt-3 grid gap-2 text-sm font-semibold">
             {notes.map((note, index) => (
-              <p key={`${note}-${index}`} className="whitespace-pre-wrap border-4 border-black bg-[#f4f1e4] p-3">{note}</p>
+              <p key={`${note}-${index}`} className="whitespace-pre-wrap border-4 border-black bg-[#dfe0e2] p-3">{note}</p>
             ))}
           </div>
         </details>

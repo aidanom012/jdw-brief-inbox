@@ -20,9 +20,9 @@ export function DeleteBriefButton({ briefId }: DeleteBriefButtonProps) {
           await deleteBriefAction(briefId);
         });
       }}
-      className="mini-button danger disabled:cursor-not-allowed disabled:opacity-50"
+      className="mini-button danger focus-ring px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {isPending ? "Deleting..." : "Delete brief"}
+      {isPending ? "Deleting..." : "Delete"}
     </button>
   );
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BriefFunnelView } from "@/components/BriefFunnelView";
 import { DeleteBriefButton } from "@/components/DeleteBriefButton";
@@ -63,8 +64,12 @@ export default async function BriefPage({ params }: BriefPageProps) {
                   <h1 className="mt-2 text-4xl font-black tracking-tight">{display(brief.artist)}</h1>
                   <p className="mt-1 text-lg font-semibold pixel-muted">{display(brief.release_title)}</p>
                 </div>
-                <div className="min-w-52">
+                <div className="flex min-w-52 flex-wrap items-end justify-end gap-2">
                   <StatusControl briefId={brief.id} status={brief.status} />
+                  <Link href={`/brief/${brief.id}/edit`} className="mini-button focus-ring px-4 py-3">
+                    Edit
+                  </Link>
+                  <DeleteBriefButton briefId={brief.id} />
                 </div>
               </div>
               {brief.missing_required_fields.length > 0 ? (
@@ -89,7 +94,6 @@ export default async function BriefPage({ params }: BriefPageProps) {
               <div className="mt-5 grid gap-4">
                 <InternalNotes briefId={brief.id} initialNotes={brief.internal_notes} />
                 <RawJsonViewer brief={brief.raw_json} />
-                <DeleteBriefButton briefId={brief.id} />
               </div>
             </details>
           </div>

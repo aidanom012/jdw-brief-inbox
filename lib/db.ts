@@ -161,6 +161,40 @@ export async function createBrief(params: {
   return mapBriefRow(data);
 }
 
+
+export async function updateBrief(params: {
+  id: string;
+  brief: JDWCampaignBrief;
+  missingFields: string[];
+}): Promise<BriefRow> {
+  const supabase = getSupabaseAdmin();
+  const { id, brief, missingFields } = params;
+
+  const { data, error } = await supabase
+    .from("briefs")
+    .update({
+      title: titleForBrief(brief),
+      artist: brief.campaign.artist,
+      release_title: brief.campaign.release_title,
+      acid: brief.campaign.acid,
+      platform: brief.campaign.platform,
+      account: brief.campaign.account,
+      objective: brief.campaign.objective,
+      raw_json: brief,
+      missing_required_fields: missingFields,
+      internal_notes: missingInfoNotes(missingFields)
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapBriefRow(data);
+}
+
 export async function updateBriefStatus(id: string, status: BriefStatus): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("briefs").update({ status }).eq("id", id);

@@ -1,7 +1,7 @@
 import type { JDWCampaignBrief } from "@/lib/brief-schema";
 
 // Keep database-safe values so existing Supabase projects do not need a migration.
-// UI labels are simplified to Draft / Completed.
+// Completed is the archive/finished state; Delete is still permanent.
 export const BRIEF_STATUSES = ["received", "done"] as const;
 
 export type BriefStatus = (typeof BRIEF_STATUSES)[number];
@@ -25,6 +25,6 @@ export function defaultStatusForBrief(_brief: JDWCampaignBrief, _missingFields: 
 
 export function statusBadgeClass(status: BriefStatus): string {
   return status === "done"
-    ? "border-black bg-black text-[#f4f1e4]"
-    : "border-black bg-[#f4f1e4] text-black";
+    ? "border-[#071013] bg-[#071013] text-[#dfe0e2]"
+    : "border-[#071013] bg-[#f7f8f8] text-[#071013]";
 }

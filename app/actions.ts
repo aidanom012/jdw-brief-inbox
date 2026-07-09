@@ -7,6 +7,7 @@ import { validateBriefJson } from "@/lib/brief-schema";
 import {
   createBrief,
   deleteBrief,
+  updateBrief,
   updateBriefStatus,
   updateChecklistItem,
   updateInternalNotes
@@ -76,6 +77,60 @@ export async function submitBriefAction(rawJson: string): Promise<SubmitBriefRes
     return {
       ok: false,
       message: error instanceof Error ? error.message : "Unable to save brief."
+    };
+  }
+}
+
+
+export async function updateBriefAction(briefId: string, rawJson: string): Promise<SubmitBriefResult> {
+  assertSameOriginRequest();
+  requireUser();
+  assertUuid(briefId);
+
+  if (rawJson.length > MAX_BRIEF_JSON_LENGTH) {
+    return {
+      ok: false,
+      message: "Brief JSON is too large."
+    };
+  }
+
+  const validation = validateBriefJson(rawJson);
+
+  if (!validation.ok) {
+    return {
+      ok: false,
+      message: validation.message,
+      issues: validation.issues
+    };
+  }
+
+  if (validation.briefs.length !== 1) {
+    return {
+      ok: false,
+      message: "Editing only supports one brief at a time."
+    };
+  }
+
+  try {
+    const validatedBrief = validation.briefs[0];
+    const brief = await updateBrief({
+      id: briefId,
+      brief: validatedBrief.brief,
+      missingFields: validatedBrief.missingFields
+    });
+
+    revalidatePath("/inbox");
+    revalidatePath(`/brief/${briefId}`);
+
+    return {
+      ok: true,
+      id: brief.id,
+      ids: [brief.id]
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unable to update brief."
     };
   }
 }

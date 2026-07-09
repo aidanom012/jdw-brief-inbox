@@ -20,7 +20,7 @@ const FILTERS: Array<{ label: string; status?: BriefStatus }> = [
 
 export default async function InboxPage({ searchParams }: InboxPageProps) {
   const role = requireUser();
-  const activeStatus = searchParams.status && isBriefStatus(searchParams.status) ? searchParams.status : undefined;
+  const activeStatus: BriefStatus = searchParams.status && isBriefStatus(searchParams.status) ? searchParams.status : "received";
   let briefs: BriefRow[] = [];
   let errorMessage: string | null = null;
 
@@ -39,7 +39,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
             <p className="pixel-label">Campaign briefs</p>
             <h1 className="mt-2 text-4xl font-black tracking-tight">Brief inbox</h1>
             <p className="mt-3 text-sm font-semibold pixel-muted">
-              {activeStatus ? STATUS_LABELS[activeStatus] : "All drafts and completed briefs"} · one login · clean funnel view
+              {STATUS_LABELS[activeStatus]} · one login · clean funnel view
             </p>
           </div>
           <Link href="/new" className="pixel-button focus-ring px-5 py-4 text-sm">
@@ -48,11 +48,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </div>
 
         <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-          <Link href="/inbox" className={`focus-ring whitespace-nowrap ${!activeStatus ? "nav-chip nav-chip-active" : "nav-chip"}`}>
-            All
-          </Link>
           {FILTERS.map((filter) => {
-            const href = `/inbox?status=${filter.status}`;
+            const href = filter.status === "received" ? "/inbox" : `/inbox?status=${filter.status}`;
             const isActive = filter.status === activeStatus;
             return (
               <Link key={filter.label} href={href} className={`focus-ring whitespace-nowrap ${isActive ? "nav-chip nav-chip-active" : "nav-chip"}`}>

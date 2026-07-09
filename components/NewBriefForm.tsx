@@ -3,8 +3,9 @@
 import type { ChangeEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { submitBriefAction } from "@/app/actions";
-import { validateBriefJson, type BriefValidationResult } from "@/lib/brief-schema";
+import { submitBriefAction, updateBriefAction } from "@/app/actions";
+import { validateBriefJson, type BriefValidationResult, type JDWCampaignBrief } from "@/lib/brief-schema";
+import { BriefFunnelView } from "@/components/BriefFunnelView";
 
 const MAX_JSON_FILE_LENGTH = 250_000;
 
@@ -338,6 +339,72 @@ function applyToAllAdSets(adSets: WizardAdSet[], values: Partial<WizardAdSet>): 
   return adSets.map((adSet) => ({ ...adSet, ...values }));
 }
 
+
+function briefToBuilderState(brief?: JDWCampaignBrief): { setup: CampaignSetup; adSets: WizardAdSet[]; ads: WizardAd[] } {
+  if (!brief) {
+    return { setup: EMPTY_SETUP, adSets: [newAdSet("Ad set 1")], ads: [newAd("Ad 1", [])] };
+  }
+
+  const setup: CampaignSetup = {
+    artist: brief.campaign.artist || "",
+    release_title: brief.campaign.release_title || "",
+    platform: (brief.campaign.platform || "") as Platform,
+    account: brief.campaign.account || "",
+    acid: brief.campaign.acid || "",
+    objective: brief.campaign.objective || "",
+    campaign_type: brief.campaign.campaign_type || "",
+    conversion_location: brief.campaign.conversion_location || "",
+    optimisation_event: brief.campaign.optimisation_event || "",
+    pixel: brief.campaign.pixel || "",
+    budget_type: (brief.budget.type || "") as BudgetType,
+    budget_amount: brief.budget.amount === null ? "" : String(brief.budget.amount),
+    currency: (brief.budget.currency || "") as Currency,
+    start_date: brief.campaign.start_date || "",
+    end_date: brief.campaign.end_date || "",
+    territory_summary: brief.campaign.territory_summary || "",
+    campaign_notes: brief.campaign.campaign_notes || brief.special_notes.join("\n") || ""
+  };
+
+  const adSets: WizardAdSet[] = (brief.ad_sets.length ? brief.ad_sets : [{ label: "Ad set 1", targeting_details: null, budget_amount: null, budget_type: null, ads: [] } as any]).map((adSet, index) => ({
+    id: uid("adset"),
+    label: adSet.label || `Ad set ${index + 1}`,
+    notes: adSet.targeting_details || adSet.notes || "",
+    budget_enabled: adSet.budget_amount !== null && adSet.budget_amount !== undefined,
+    budget_amount: adSet.budget_amount === null || adSet.budget_amount === undefined ? "" : String(adSet.budget_amount),
+    budget_type: (adSet.budget_type || "") as WizardAdSet["budget_type"]
+  }));
+
+  const nestedAds: WizardAd[] = [];
+  brief.ad_sets.forEach((adSet, adSetIndex) => {
+    const adSetId = adSets[adSetIndex]?.id;
+    (adSet.ads || []).forEach((ad, index) => {
+      nestedAds.push({
+        id: uid("ad"),
+        label: ad.label || ad.release_title || `Ad ${nestedAds.length + index + 1}`,
+        asset_type: (ad.asset_type || "") as AssetType,
+        asset_links: [...(ad.asset_links || []), ad.post_url || "", ad.boost_code || ""].filter(Boolean).join("\n"),
+        destination_url: ad.destination_url || "",
+        copy: ad.copy || "",
+        notes: ad.notes || "",
+        assignedAdSetIds: adSetId ? [adSetId] : []
+      });
+    });
+  });
+
+  const flatAds: WizardAd[] = nestedAds.length > 0 ? nestedAds : (brief.ads || []).map((ad, index) => ({
+    id: uid("ad"),
+    label: ad.label || ad.release_title || `Ad ${index + 1}`,
+    asset_type: (ad.asset_type || "") as AssetType,
+    asset_links: [...(ad.asset_links || []), ad.post_url || "", ad.boost_code || ""].filter(Boolean).join("\n"),
+    destination_url: ad.destination_url || "",
+    copy: ad.copy || "",
+    notes: ad.notes || "",
+    assignedAdSetIds: adSets.map((adSet) => adSet.id)
+  }));
+
+  return { setup, adSets, ads: flatAds.length ? flatAds : [newAd("Ad 1", adSets.map((adSet) => adSet.id))] };
+}
+
 function toggleAssignedAdSet(ad: WizardAd, adSetId: string): string[] {
   return ad.assignedAdSetIds.includes(adSetId)
     ? ad.assignedAdSetIds.filter((id) => id !== adSetId)
@@ -345,100 +412,18 @@ function toggleAssignedAdSet(ad: WizardAd, adSetId: string): string[] {
 }
 
 function FunnelPreview({ setup, adSets, ads }: { setup: CampaignSetup; adSets: WizardAdSet[]; ads: WizardAd[] }) {
-  const [selected, setSelected] = useState<{ type: "campaign" | "adset" | "ad"; id: string }>(
-    { type: "campaign", id: "campaign" }
-  );
-
-  const selectedAdSet = selected.type === "adset" ? adSets.find((adSet) => adSet.id === selected.id) : null;
-  const selectedAd = selected.type === "ad" ? ads.find((ad) => ad.id === selected.id) : null;
-  const assignedAdSets = selectedAd ? adSets.filter((adSet) => selectedAd.assignedAdSetIds.includes(adSet.id)) : [];
-  const adsForSelectedAdSet = selectedAdSet ? ads.filter((ad) => ad.assignedAdSetIds.includes(selectedAdSet.id)) : [];
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-      <div className="pixel-card overflow-x-auto p-4">
-        <div className="grid min-w-[760px] grid-cols-[190px_1fr_1fr] items-center gap-6">
-          <button
-            type="button"
-            onClick={() => setSelected({ type: "campaign", id: "campaign" })}
-            className={`pixel-node p-4 text-left ${selected.type === "campaign" ? "pixel-node-active" : ""}`}
-          >
-            <span className="pixel-label block">Campaign</span>
-            <strong className="mt-2 block text-xl">{setup.artist || "Artist"}</strong>
-            <span className="mt-1 block text-sm">{setup.objective || "Objective"}</span>
-          </button>
-
-          <div className="grid gap-3">
-            {adSets.map((adSet, index) => (
-              <button
-                key={adSet.id}
-                type="button"
-                onClick={() => setSelected({ type: "adset", id: adSet.id })}
-                className={`pixel-node p-3 text-left ${selected.type === "adset" && selected.id === adSet.id ? "pixel-node-active" : ""}`}
-              >
-                <span className="pixel-label block">Ad set {index + 1}</span>
-                <strong className="mt-1 block">{adSet.label || `Ad set ${index + 1}`}</strong>
-                <span className="mt-1 block text-xs">{ads.filter((ad) => ad.assignedAdSetIds.includes(adSet.id)).length} ads assigned</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="grid gap-3">
-            {ads.map((ad, index) => (
-              <button
-                key={ad.id}
-                type="button"
-                onClick={() => setSelected({ type: "ad", id: ad.id })}
-                className={`pixel-node p-3 text-left ${selected.type === "ad" && selected.id === ad.id ? "pixel-node-active" : ""}`}
-              >
-                <span className="pixel-label block">Ad {index + 1}</span>
-                <strong className="mt-1 block">{ad.label || `Ad ${index + 1}`}</strong>
-                <span className="mt-1 block text-xs">{ad.assignedAdSetIds.length} ad sets</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <aside className="pixel-card p-4">
-        <span className="pixel-label block">Selected</span>
-        {selected.type === "campaign" ? (
-          <div className="mt-3 grid gap-2 text-sm font-semibold">
-            <h3 className="text-2xl font-black">{setup.artist || "Untitled campaign"}</h3>
-            <p>{setup.release_title || "No release title"}</p>
-            <p>{setup.platform || "Unknown platform"} · {setup.account || "No account yet"}</p>
-            <p>ACID: {setup.acid || "Missing"}</p>
-            <p>Budget: {setup.budget_amount || "Missing"} {setup.currency || ""}</p>
-          </div>
-        ) : null}
-        {selectedAdSet ? (
-          <div className="mt-3 grid gap-2 text-sm font-semibold">
-            <h3 className="text-2xl font-black">{selectedAdSet.label || "Untitled ad set"}</h3>
-            <p className="whitespace-pre-wrap">{selectedAdSet.notes || "No targeting notes yet."}</p>
-            <p>Budget: {selectedAdSet.budget_enabled ? `${selectedAdSet.budget_amount || "Missing"} ${selectedAdSet.budget_type || ""}` : "Campaign level"}</p>
-            <p>{adsForSelectedAdSet.length} ads will run here.</p>
-          </div>
-        ) : null}
-        {selectedAd ? (
-          <div className="mt-3 grid gap-2 text-sm font-semibold">
-            <h3 className="text-2xl font-black">{selectedAd.label || "Untitled ad"}</h3>
-            <p>{selectedAd.asset_type || "Unknown asset type"}</p>
-            <p className="whitespace-pre-wrap">{selectedAd.copy || "No copy yet."}</p>
-            <p className="break-words">{selectedAd.destination_url || "No destination link yet."}</p>
-            <p>Sent to: {assignedAdSets.map((adSet) => adSet.label || "Untitled").join(", ") || "no ad sets"}</p>
-          </div>
-        ) : null}
-      </aside>
-    </div>
-  );
+  const previewBrief = useMemo(() => buildBrief(setup, adSets, ads) as JDWCampaignBrief, [setup, adSets, ads]);
+  return <BriefFunnelView brief={previewBrief} />;
 }
 
-export function NewBriefForm() {
+
+export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCampaignBrief; briefId?: string }) {
   const router = useRouter();
+  const initialState = useMemo(() => briefToBuilderState(initialBrief), [initialBrief]);
   const [step, setStep] = useState(1);
-  const [setup, setSetup] = useState<CampaignSetup>(EMPTY_SETUP);
-  const [adSets, setAdSets] = useState<WizardAdSet[]>([newAdSet("Ad set 1")]);
-  const [ads, setAds] = useState<WizardAd[]>([newAd("Ad 1", [])]);
+  const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
+  const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
+  const [ads, setAds] = useState<WizardAd[]>(initialState.ads);
   const [sameAdSetNotes, setSameAdSetNotes] = useState("");
   const [sameBudgetEnabled, setSameBudgetEnabled] = useState(false);
   const [sameBudgetAmount, setSameBudgetAmount] = useState("");
@@ -502,7 +487,9 @@ export function NewBriefForm() {
     }
 
     startTransition(async () => {
-      const result = await submitBriefAction(activeJson);
+      const result = briefId
+        ? await updateBriefAction(briefId, activeJson)
+        : await submitBriefAction(activeJson);
       if (!result.ok) {
         setSubmitError(result.message);
         return;
@@ -539,53 +526,65 @@ export function NewBriefForm() {
               <p className="mt-2 text-sm font-semibold pixel-muted">Only campaign-level facts here. Leave unknown things blank.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <FieldShell label="Artist"><TextInput value={setup.artist} onChange={(e) => updateSetup("artist", e.target.value)} /></FieldShell>
-              <FieldShell label="Release / project"><TextInput value={setup.release_title} onChange={(e) => updateSetup("release_title", e.target.value)} /></FieldShell>
-              <FieldShell label="Platform">
-                <SelectInput value={setup.platform} onChange={(e) => updateSetup("platform", e.target.value as Platform)}>
-                  <option value="">Unknown</option>
-                  {PLATFORM_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </SelectInput>
-              </FieldShell>
-              <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} /></FieldShell>
-              <FieldShell label="ACID"><TextInput value={setup.acid} onChange={(e) => updateSetup("acid", e.target.value)} /></FieldShell>
-              <FieldShell label="Objective">
-                <TextInput list="objective-presets" value={setup.objective} onChange={(e) => updateSetup("objective", e.target.value)} />
-                <DataList id="objective-presets" options={OBJECTIVE_PRESETS} />
-              </FieldShell>
-              <FieldShell label="Campaign type">
-                <TextInput list="campaign-type-presets" value={setup.campaign_type} onChange={(e) => updateSetup("campaign_type", e.target.value)} />
-                <DataList id="campaign-type-presets" options={CAMPAIGN_TYPE_PRESETS} />
-              </FieldShell>
-              <FieldShell label="Conversion location">
-                <TextInput list="conversion-presets" value={setup.conversion_location} onChange={(e) => updateSetup("conversion_location", e.target.value)} />
-                <DataList id="conversion-presets" options={CONVERSION_LOCATION_PRESETS} />
-              </FieldShell>
-              <FieldShell label="Optimisation event">
-                <TextInput list="optimisation-presets" value={setup.optimisation_event} onChange={(e) => updateSetup("optimisation_event", e.target.value)} />
-                <DataList id="optimisation-presets" options={OPTIMISATION_PRESETS} />
-              </FieldShell>
-              <FieldShell label="Pixel"><TextInput value={setup.pixel} onChange={(e) => updateSetup("pixel", e.target.value)} /></FieldShell>
-              <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} /></FieldShell>
-              <FieldShell label="Budget type">
-                <SelectInput value={setup.budget_type} onChange={(e) => updateSetup("budget_type", e.target.value as BudgetType)}>
-                  <option value="">Unknown</option>
-                  {BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </SelectInput>
-              </FieldShell>
-              <FieldShell label="Currency">
-                <SelectInput value={setup.currency} onChange={(e) => updateSetup("currency", e.target.value as Currency)}>
-                  <option value="">Unknown</option>
-                  {CURRENCY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </SelectInput>
-              </FieldShell>
-              <FieldShell label="Start date"><TextInput type="date" value={setup.start_date} onChange={(e) => updateSetup("start_date", e.target.value)} /></FieldShell>
-              <FieldShell label="End date"><TextInput type="date" value={setup.end_date} onChange={(e) => updateSetup("end_date", e.target.value)} /></FieldShell>
-              <FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / FR NL BE / Global" /></FieldShell>
-              <div className="md:col-span-2 lg:col-span-3">
-                <FieldShell label="Campaign notes"><TextArea value={setup.campaign_notes} onChange={(e) => updateSetup("campaign_notes", e.target.value)} placeholder="Anything James says that matters but doesn't fit a field." /></FieldShell>
+            <div className="grid gap-5">
+              <div className="pixel-card p-4">
+                <p className="pixel-label">Core details</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <FieldShell label="Artist"><TextInput value={setup.artist} onChange={(e) => updateSetup("artist", e.target.value)} /></FieldShell>
+                  <FieldShell label="Release / project"><TextInput value={setup.release_title} onChange={(e) => updateSetup("release_title", e.target.value)} /></FieldShell>
+                  <FieldShell label="Platform">
+                    <SelectInput value={setup.platform} onChange={(e) => updateSetup("platform", e.target.value as Platform)}>
+                      <option value="">Unknown</option>
+                      {PLATFORM_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </SelectInput>
+                  </FieldShell>
+                  <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} /></FieldShell>
+                  <FieldShell label="ACID"><TextInput value={setup.acid} onChange={(e) => updateSetup("acid", e.target.value)} /></FieldShell>
+                  <FieldShell label="Objective">
+                    <TextInput list="objective-presets" value={setup.objective} onChange={(e) => updateSetup("objective", e.target.value)} />
+                    <DataList id="objective-presets" options={OBJECTIVE_PRESETS} />
+                  </FieldShell>
+                  <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} /></FieldShell>
+                  <FieldShell label="Budget type">
+                    <SelectInput value={setup.budget_type} onChange={(e) => updateSetup("budget_type", e.target.value as BudgetType)}>
+                      <option value="">Unknown</option>
+                      {BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </SelectInput>
+                  </FieldShell>
+                  <FieldShell label="Currency">
+                    <SelectInput value={setup.currency} onChange={(e) => updateSetup("currency", e.target.value as Currency)}>
+                      <option value="">Unknown</option>
+                      {CURRENCY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </SelectInput>
+                  </FieldShell>
+                </div>
               </div>
+
+              <details className="pixel-card p-4">
+                <summary className="cursor-pointer font-mono text-sm font-black uppercase tracking-[0.16em]">
+                  Platform setup / dates / pixel
+                </summary>
+                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <FieldShell label="Campaign type">
+                    <TextInput list="campaign-type-presets" value={setup.campaign_type} onChange={(e) => updateSetup("campaign_type", e.target.value)} />
+                    <DataList id="campaign-type-presets" options={CAMPAIGN_TYPE_PRESETS} />
+                  </FieldShell>
+                  <FieldShell label="Conversion location">
+                    <TextInput list="conversion-presets" value={setup.conversion_location} onChange={(e) => updateSetup("conversion_location", e.target.value)} />
+                    <DataList id="conversion-presets" options={CONVERSION_LOCATION_PRESETS} />
+                  </FieldShell>
+                  <FieldShell label="Optimisation event">
+                    <TextInput list="optimisation-presets" value={setup.optimisation_event} onChange={(e) => updateSetup("optimisation_event", e.target.value)} />
+                    <DataList id="optimisation-presets" options={OPTIMISATION_PRESETS} />
+                  </FieldShell>
+                  <FieldShell label="Pixel"><TextInput value={setup.pixel} onChange={(e) => updateSetup("pixel", e.target.value)} /></FieldShell>
+                  <FieldShell label="Start date"><TextInput type="date" value={setup.start_date} onChange={(e) => updateSetup("start_date", e.target.value)} /></FieldShell>
+                  <FieldShell label="End date"><TextInput type="date" value={setup.end_date} onChange={(e) => updateSetup("end_date", e.target.value)} /></FieldShell>
+                  <FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / FR NL BE / Global" /></FieldShell>
+                </div>
+              </details>
+
+              <FieldShell label="Campaign notes"><TextArea value={setup.campaign_notes} onChange={(e) => updateSetup("campaign_notes", e.target.value)} placeholder="Anything James says that matters but doesn't fit a field." /></FieldShell>
             </div>
           </section>
         ) : null}
@@ -793,7 +792,7 @@ export function NewBriefForm() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <button type="button" onClick={() => setStep(3)} className="mini-button px-4 py-3">Back</button>
               <button type="button" onClick={submitBrief} disabled={isPending} className="pixel-button px-6 py-4 text-sm disabled:opacity-60">
-                {isPending ? "Saving..." : importedJson ? "Submit imported JSON" : "Save draft"}
+                {isPending ? "Saving..." : briefId ? "Update brief" : importedJson ? "Submit imported JSON" : "Save draft"}
               </button>
             </div>
           </section>
