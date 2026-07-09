@@ -6,9 +6,9 @@ type RawJsonViewerProps = {
 
 export function RawJsonViewer({ brief }: RawJsonViewerProps) {
   return (
-    <details className="rounded-lg border border-white/10 bg-panel p-4">
-      <summary className="cursor-pointer text-lg font-semibold text-white">Raw JSON</summary>
-      <pre className="mt-4 max-h-[520px] overflow-auto rounded-md border border-white/10 bg-ink p-4 text-xs leading-6 text-zinc-200">
+    <details className="pixel-card p-4">
+      <summary className="cursor-pointer font-mono text-sm font-black uppercase tracking-[0.16em]">Raw JSON</summary>
+      <pre className="mt-4 max-h-[520px] overflow-auto border-4 border-black bg-[#f4f1e4] p-4 text-xs leading-6">
         {JSON.stringify(brief, null, 2)}
       </pre>
     </details>

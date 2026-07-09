@@ -15,7 +15,7 @@ export function StatusControl({ briefId, status }: StatusControlProps) {
 
   return (
     <label className="block">
-      <span className="text-sm text-zinc-500">Status</span>
+      <span className="pixel-label">Status</span>
       <select
         value={currentStatus}
         disabled={isPending}
@@ -26,7 +26,7 @@ export function StatusControl({ briefId, status }: StatusControlProps) {
             await updateBriefStatusAction(briefId, nextStatus);
           });
         }}
-        className="focus-ring mt-2 w-full min-w-52 rounded-md border border-white/10 bg-ink px-3 py-3 font-semibold text-white"
+        className="field mt-2 min-w-52"
       >
         {BRIEF_STATUSES.map((option) => (
           <option key={option} value={option}>

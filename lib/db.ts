@@ -1,8 +1,7 @@
-import { DEFAULT_CHECKLIST_ITEMS } from "@/lib/checklist";
 import type { JDWCampaignBrief } from "@/lib/brief-schema";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { BriefStatus } from "@/lib/status";
-import { defaultStatusForBrief } from "@/lib/status";
+import { defaultStatusForBrief, isBriefStatus } from "@/lib/status";
 import type { UserRole } from "@/lib/auth";
 
 export type BriefRow = {
@@ -51,11 +50,17 @@ function missingInfoNotes(missingFields: string[]): string {
   return ["Missing info to fill later:", ...missingFields.map((field) => `- ${field}:`)].join("\n");
 }
 
+function normalizedStatus(value: unknown): BriefStatus {
+  const raw = String(value || "received");
+  if (isBriefStatus(raw)) return raw;
+  return raw === "done" ? "done" : "received";
+}
+
 function mapBriefRow(row: Record<string, unknown>): BriefRow {
   return {
     id: String(row.id),
     title: String(row.title),
-    status: row.status as BriefStatus,
+    status: normalizedStatus(row.status),
     artist: (row.artist as string | null) ?? null,
     release_title: (row.release_title as string | null) ?? null,
     acid: (row.acid as string | null) ?? null,
@@ -151,18 +156,6 @@ export async function createBrief(params: {
 
   if (error) {
     throw error;
-  }
-
-  const checklistRows = DEFAULT_CHECKLIST_ITEMS.map((label, index) => ({
-    brief_id: data.id,
-    label,
-    sort_order: index
-  }));
-
-  const { error: checklistError } = await supabase.from("checklist_items").insert(checklistRows);
-  if (checklistError) {
-    await supabase.from("briefs").delete().eq("id", data.id);
-    throw checklistError;
   }
 
   return mapBriefRow(data);

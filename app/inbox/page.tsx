@@ -14,12 +14,8 @@ type InboxPageProps = {
 };
 
 const FILTERS: Array<{ label: string; status?: BriefStatus }> = [
-  { label: "All" },
-  { label: "Incomplete", status: "incomplete" },
-  { label: "Ready", status: "ready_to_build" },
-  { label: "Building", status: "building" },
-  { label: "Needs James", status: "needs_james" },
-  { label: "Done", status: "done" }
+  { label: "Draft", status: "received" },
+  { label: "Completed", status: "done" }
 ];
 
 export default async function InboxPage({ searchParams }: InboxPageProps) {
@@ -37,13 +33,13 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <div className="animate-rise flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="font-mono text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Campaign control</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight text-white">Brief inbox</h1>
-            <p className="mt-3 text-sm text-zinc-400">
-              {activeStatus ? STATUS_LABELS[activeStatus] : "All campaign briefs"} · single login · full access
+            <p className="pixel-label">Campaign briefs</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight">Brief inbox</h1>
+            <p className="mt-3 text-sm font-semibold pixel-muted">
+              {activeStatus ? STATUS_LABELS[activeStatus] : "All drafts and completed briefs"} · one login · clean funnel view
             </p>
           </div>
           <Link href="/new" className="pixel-button focus-ring px-5 py-4 text-sm">
@@ -52,10 +48,12 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </div>
 
         <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
+          <Link href="/inbox" className={`focus-ring whitespace-nowrap ${!activeStatus ? "nav-chip nav-chip-active" : "nav-chip"}`}>
+            All
+          </Link>
           {FILTERS.map((filter) => {
-            const href = filter.status ? `/inbox?status=${filter.status}` : "/inbox";
-            const isActive = filter.status === activeStatus || (!filter.status && !activeStatus);
-
+            const href = `/inbox?status=${filter.status}`;
+            const isActive = filter.status === activeStatus;
             return (
               <Link key={filter.label} href={href} className={`focus-ring whitespace-nowrap ${isActive ? "nav-chip nav-chip-active" : "nav-chip"}`}>
                 {filter.label}
@@ -65,16 +63,16 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </div>
 
         {errorMessage ? (
-          <section className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-100">
+          <section className="mt-6 pixel-alert p-4">
             {errorMessage}
           </section>
         ) : null}
 
         {!errorMessage && briefs.length === 0 ? (
-          <section className="mt-8 rounded-2xl border border-white/10 bg-panel/80 p-8 text-center shadow-neon backdrop-blur-xl">
-            <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">Empty</p>
-            <h2 className="mt-2 text-2xl font-black text-white">No briefs yet.</h2>
-            <p className="mt-2 text-zinc-400">Create one with the three-step builder.</p>
+          <section className="mt-8 pixel-window p-8 text-center">
+            <p className="pixel-label">Empty</p>
+            <h2 className="mt-2 text-2xl font-black">No briefs yet.</h2>
+            <p className="mt-2 font-semibold pixel-muted">Create one with the campaign → ad sets → ads flow.</p>
           </section>
         ) : null}
 

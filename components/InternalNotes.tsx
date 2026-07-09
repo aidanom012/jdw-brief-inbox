@@ -14,10 +14,10 @@ export function InternalNotes({ briefId, initialNotes }: InternalNotesProps) {
   const [isPending, startTransition] = useTransition();
 
   return (
-    <section className="rounded-lg border border-white/10 bg-panel p-4">
+    <section className="pixel-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-white">Internal notes</h2>
-        {saved ? <span className="text-sm text-emerald-200">Saved</span> : null}
+        <h2 className="font-mono text-sm font-black uppercase tracking-[0.16em]">Internal notes</h2>
+        {saved ? <span className="pixel-missing px-2 py-1 font-mono text-xs font-black">Saved</span> : null}
       </div>
       <textarea
         value={notes}
@@ -25,7 +25,7 @@ export function InternalNotes({ briefId, initialNotes }: InternalNotesProps) {
           setNotes(event.target.value);
           setSaved(false);
         }}
-        className="focus-ring mt-4 min-h-36 w-full resize-y rounded-md border border-white/10 bg-ink p-3 text-sm leading-6 text-zinc-100"
+        className="field mt-4 min-h-36 resize-y text-sm leading-6"
       />
       <button
         type="button"
@@ -36,7 +36,7 @@ export function InternalNotes({ briefId, initialNotes }: InternalNotesProps) {
             setSaved(true);
           });
         }}
-        className="focus-ring mt-3 rounded-md bg-teal-300 px-4 py-2 font-semibold text-ink hover:bg-teal-200 disabled:cursor-not-allowed disabled:opacity-50"
+        className="pixel-button mt-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? "Saving..." : "Save notes"}
       </button>

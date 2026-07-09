@@ -10,12 +10,12 @@ export default function NewBriefPage() {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-6 animate-rise">
-          <p className="font-mono text-xs font-black uppercase tracking-[0.28em] text-[#201203]">8-bit campaign builder</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#201203]">New brief builder</h1>
-          <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5c4218]">
-            Keep the campaign-level useful details, then keep ad sets and ads dead simple. Claude JSON is optional — the form is the main thing.
+          <p className="pixel-label">8-bit campaign builder</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight">New brief</h1>
+          <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 pixel-muted">
+            Campaign facts first. Then simple ad set notes. Then create ads once and choose which ad sets they go to.
           </p>
         </div>
         <NewBriefForm />
