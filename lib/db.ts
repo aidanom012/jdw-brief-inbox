@@ -128,7 +128,7 @@ export async function createBrief(params: {
 }): Promise<BriefRow> {
   const supabase = getSupabaseAdmin();
   const { brief, missingFields, submittedBy } = params;
-  const status = defaultStatusForBrief(missingFields, brief.build);
+  const status = defaultStatusForBrief(brief, missingFields);
 
   const { data, error } = await supabase
     .from("briefs")

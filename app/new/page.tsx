@@ -10,10 +10,13 @@ export default function NewBriefPage() {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold text-white">New brief</h1>
-          <p className="mt-2 text-sm text-zinc-400">Claude-generated JDW_CAMPAIGN_BRIEF_V1 JSON only.</p>
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mb-6 animate-rise">
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Campaign command flow</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-white">New brief builder</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
+            A simple three-step builder: campaign setup, ad sets with nested ads, then review. Claude JSON is optional — the form is the main source of truth.
+          </p>
         </div>
         <NewBriefForm />
       </main>

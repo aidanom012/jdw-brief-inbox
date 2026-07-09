@@ -1,4 +1,4 @@
-import type { JDWCampaignBrief } from "@/lib/brief-schema";
+import { adsForBrief, type JDWCampaignBrief } from "@/lib/brief-schema";
 
 function cleanToken(value: string | null | undefined, fallback: string): string {
   const normalized = (value || fallback)
@@ -139,7 +139,7 @@ export function suggestedAdSetNames(brief: JDWCampaignBrief): string[] {
 }
 
 export function suggestedAdNames(brief: JDWCampaignBrief): string[] {
-  return brief.ads.map((ad, index) => {
+  return adsForBrief(brief).map((ad, index) => {
     const assetType = formatToken(ad.asset_type);
     const release = cleanToken(ad.release_title || brief.campaign.release_title, "release");
     const descriptor = cleanToken(ad.label || ad.notes, `ad-${index + 1}`);

@@ -1,6 +1,20 @@
-# JDW Brief Inbox
+# JDW Brief Builder
 
-Minimal private Next.js app for turning Claude-generated `JDW_CAMPAIGN_BRIEF_V1` JSON into a brief card, validation state, build checklist, and visible campaign status.
+Private Next.js campaign brief builder for JDW campaign builds.
+
+The app now uses one passcode login only. Once authenticated, the user has full access to all pages and actions.
+
+## Main flow
+
+- `/login`: one private passcode.
+- `/inbox`: campaign brief inbox with status filters.
+- `/new`: three-step brief builder:
+  1. Campaign setup.
+  2. Ad sets with nested ads underneath each parent ad set.
+  3. Review, missing info, and build checklist preview.
+- `/brief/[id]`: structured build view, missing fields, naming suggestions, checklist, internal notes, and raw JSON.
+
+Claude JSON import still exists, but it is optional. The form builder is the main source of truth.
 
 ## Setup
 
@@ -8,13 +22,14 @@ Minimal private Next.js app for turning Claude-generated `JDW_CAMPAIGN_BRIEF_V1`
 2. Add environment variables:
 
 ```env
-AIDAN_PASSCODE=
-JAMES_PASSCODE=
-NEXT_PUBLIC_APP_NAME=JDW Brief Inbox
+JDW_PASSCODE=
+NEXT_PUBLIC_APP_NAME=JDW Brief Builder
 NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SESSION_SECRET=
 ```
+
+Existing `AIDAN_PASSCODE` and `JAMES_PASSCODE` still work as fallback passcodes if you already configured them in Vercel.
 
 3. Install and run:
 
@@ -23,11 +38,4 @@ pnpm install
 pnpm dev
 ```
 
-## Routes
-
-- `/login`: private passcode login.
-- `/inbox`: filtered brief inbox.
-- `/new`: paste, validate, and submit Claude JSON.
-- `/brief/[id]`: structured brief, missing fields, naming, checklist, notes, and raw JSON.
-
-The app does not call AI services and does not infer missing campaign details. It only parses, validates, displays, and tracks build progress.
+The app does not infer missing campaign details. Blank fields stay blank and appear in the missing info list.

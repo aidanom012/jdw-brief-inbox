@@ -37,19 +37,17 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <div className="animate-rise flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-white">Inbox</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              {activeStatus ? STATUS_LABELS[activeStatus] : "All campaign briefs"}
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Campaign control</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight text-white">Brief inbox</h1>
+            <p className="mt-3 text-sm text-zinc-400">
+              {activeStatus ? STATUS_LABELS[activeStatus] : "All campaign briefs"} · single login · full access
             </p>
           </div>
-          <Link
-            href="/new"
-            className="focus-ring rounded-md bg-teal-300 px-4 py-3 font-semibold text-ink hover:bg-teal-200"
-          >
-            New Brief
+          <Link href="/new" className="pixel-button focus-ring px-5 py-4 text-sm">
+            + New brief
           </Link>
         </div>
 
@@ -59,15 +57,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
             const isActive = filter.status === activeStatus || (!filter.status && !activeStatus);
 
             return (
-              <Link
-                key={filter.label}
-                href={href}
-                className={`focus-ring whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium ${
-                  isActive
-                    ? "border-teal-300/40 bg-teal-300/15 text-teal-100"
-                    : "border-white/10 text-zinc-300 hover:bg-white/10"
-                }`}
-              >
+              <Link key={filter.label} href={href} className={`focus-ring whitespace-nowrap ${isActive ? "nav-chip nav-chip-active" : "nav-chip"}`}>
                 {filter.label}
               </Link>
             );
@@ -75,15 +65,16 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </div>
 
         {errorMessage ? (
-          <section className="mt-6 rounded-lg border border-amber-400/30 bg-amber-500/10 p-4 text-amber-100">
+          <section className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-100">
             {errorMessage}
           </section>
         ) : null}
 
         {!errorMessage && briefs.length === 0 ? (
-          <section className="mt-8 rounded-lg border border-white/10 bg-panel p-8 text-center shadow-glow">
-            <h2 className="text-xl font-semibold text-white">No briefs yet.</h2>
-            <p className="mt-2 text-zinc-400">Paste a Claude campaign brief to get started.</p>
+          <section className="mt-8 rounded-2xl border border-white/10 bg-panel/80 p-8 text-center shadow-neon backdrop-blur-xl">
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">Empty</p>
+            <h2 className="mt-2 text-2xl font-black text-white">No briefs yet.</h2>
+            <p className="mt-2 text-zinc-400">Create one with the three-step builder.</p>
           </section>
         ) : null}
 

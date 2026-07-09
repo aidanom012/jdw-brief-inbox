@@ -14,9 +14,7 @@ const targetingTypeSchema = z
   .enum(["broad", "interest", "lookalike", "retargeting", "advantage_plus", "unknown"])
   .nullable();
 const assetTypeSchema = z.enum(["video", "image", "carousel", "spark_ad", "unknown"]).nullable();
-const adSetBudgetTypeSchema = z
-  .enum(["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"])
-  .nullable();
+const adSetBudgetTypeSchema = z.enum(["daily", "lifetime", "campaign_total", "unknown"]).nullable();
 const sourceTypeSchema = z
   .enum(["email", "handover", "paid_media_brief", "report", "quick_note", "unknown"])
   .nullable();
@@ -33,6 +31,38 @@ const buildActionSchema = z
   ])
   .nullable();
 const buildPrioritySchema = z.enum(["urgent", "normal", "hold", "unknown"]).nullable();
+
+const adSchema = z
+  .object({
+    label: nullableString,
+    release_title: nullableString,
+    asset_type: assetTypeSchema,
+    asset_links: z.array(z.string()),
+    post_url: nullableString.optional(),
+    boost_code: nullableString.optional(),
+    destination_url: nullableString,
+    copy: nullableString,
+    notes: nullableString
+  })
+  .strict();
+
+const adSetSchema = z
+  .object({
+    label: nullableString,
+    locations: z.array(z.string()),
+    age_min: nullableNumber,
+    age_max: nullableNumber,
+    gender: genderSchema,
+    placements: z.array(z.string()),
+    targeting_type: targetingTypeSchema,
+    targeting_details: nullableString,
+    exclusions: nullableString,
+    budget_amount: nullableNumber.optional(),
+    budget_type: adSetBudgetTypeSchema.optional(),
+    notes: nullableString.optional(),
+    ads: z.array(adSchema).optional()
+  })
+  .strict();
 
 export const campaignBriefSchema = z
   .object({
@@ -72,7 +102,8 @@ export const campaignBriefSchema = z
         pixel: nullableString,
         territory_summary: nullableString,
         start_date: nullableString,
-        end_date: nullableString
+        end_date: nullableString,
+        campaign_notes: nullableString.optional()
       })
       .strict(),
     budget: z
@@ -83,38 +114,8 @@ export const campaignBriefSchema = z
         notes: nullableString
       })
       .strict(),
-    ad_sets: z.array(
-      z
-        .object({
-          label: nullableString,
-          locations: z.array(z.string()),
-          age_min: nullableNumber,
-          age_max: nullableNumber,
-          gender: genderSchema,
-          placements: z.array(z.string()),
-          targeting_type: targetingTypeSchema,
-          targeting_details: nullableString,
-          exclusions: nullableString,
-          budget_amount: nullableNumber.optional(),
-          budget_type: adSetBudgetTypeSchema.optional()
-        })
-        .strict()
-    ),
-    ads: z.array(
-      z
-        .object({
-          label: nullableString,
-          release_title: nullableString,
-          asset_type: assetTypeSchema,
-          asset_links: z.array(z.string()),
-          post_url: nullableString.optional(),
-          boost_code: nullableString.optional(),
-          destination_url: nullableString,
-          copy: nullableString,
-          notes: nullableString
-        })
-        .strict()
-    ),
+    ad_sets: z.array(adSetSchema),
+    ads: z.array(adSchema).optional().default([]),
     special_notes: z.array(z.string()),
     missing_required_fields: z.array(z.string())
   })
@@ -128,6 +129,9 @@ export const campaignBriefBatchSchema = z
   .strict();
 
 export type JDWCampaignBrief = z.infer<typeof campaignBriefSchema>;
+export type JDWAd = JDWCampaignBrief["ads"][number];
+export type JDWAdSet = JDWCampaignBrief["ad_sets"][number];
+
 export type ValidatedBrief = {
   brief: JDWCampaignBrief;
   missingFields: string[];
@@ -154,12 +158,14 @@ function isPresentArray(value: unknown[] | null | undefined): boolean {
   return Array.isArray(value) && value.length > 0;
 }
 
-function hasAdAssetReference(ad: JDWCampaignBrief["ads"][number]): boolean {
-  return (
-    isPresentArray(ad.asset_links) ||
-    isPresentString(ad.post_url) ||
-    isPresentString(ad.boost_code)
-  );
+export function adsForBrief(brief: JDWCampaignBrief): JDWAd[] {
+  const flatAds = brief.ads || [];
+  const nestedAds = brief.ad_sets.flatMap((adSet) => adSet.ads || []);
+  return flatAds.length > 0 ? flatAds : nestedAds;
+}
+
+function hasAdAssetReference(ad: JDWAd): boolean {
+  return isPresentArray(ad.asset_links) || isPresentString(ad.post_url) || isPresentString(ad.boost_code);
 }
 
 function addMissing(missing: Set<string>, path: string): void {
@@ -193,6 +199,7 @@ function isVideoViewCampaign(brief: JDWCampaignBrief): boolean {
 
 export function computeMissingFields(brief: JDWCampaignBrief): string[] {
   const missing = new Set<string>();
+  const allAds = adsForBrief(brief);
 
   if (!isPresentString(brief.campaign.artist)) addMissing(missing, "campaign.artist");
   if (!isPresentString(brief.campaign.acid)) addMissing(missing, "campaign.acid");
@@ -203,19 +210,13 @@ export function computeMissingFields(brief: JDWCampaignBrief): string[] {
   if (brief.budget.amount === null) addMissing(missing, "budget.amount");
   if (!brief.budget.currency || brief.budget.currency === "unknown") addMissing(missing, "budget.currency");
   if (!isPresentArray(brief.ad_sets)) addMissing(missing, "ad_sets");
-  if (!isPresentArray(brief.ads)) addMissing(missing, "ads");
+  if (!isPresentArray(allAds)) addMissing(missing, "ads");
 
   const requiresMetaConversionFields = isMetaConversionOrStreamingCampaign(brief);
   if (requiresMetaConversionFields) {
-    if (!isPresentString(brief.campaign.conversion_location)) {
-      addMissing(missing, "campaign.conversion_location");
-    }
-    if (!isPresentString(brief.campaign.optimisation_event)) {
-      addMissing(missing, "campaign.optimisation_event");
-    }
-    if (!isPresentString(brief.campaign.pixel)) {
-      addMissing(missing, "campaign.pixel");
-    }
+    if (!isPresentString(brief.campaign.conversion_location)) addMissing(missing, "campaign.conversion_location");
+    if (!isPresentString(brief.campaign.optimisation_event)) addMissing(missing, "campaign.optimisation_event");
+    if (!isPresentString(brief.campaign.pixel)) addMissing(missing, "campaign.pixel");
   }
 
   const requiresVideoAssets = isVideoViewCampaign(brief);
@@ -225,15 +226,14 @@ export function computeMissingFields(brief: JDWCampaignBrief): string[] {
     if (adSet.age_min === null) addMissing(missing, `ad_sets[${index}].age_min`);
     if (adSet.age_max === null) addMissing(missing, `ad_sets[${index}].age_max`);
     if (!isPresentArray(adSet.placements)) addMissing(missing, `ad_sets[${index}].placements`);
+    if ((adSet.ads || []).length === 0 && (brief.ads || []).length === 0) addMissing(missing, `ad_sets[${index}].ads`);
   });
 
-  brief.ads.forEach((ad, index) => {
+  allAds.forEach((ad, index) => {
     if (!ad.asset_type || ad.asset_type === "unknown") addMissing(missing, `ads[${index}].asset_type`);
     if (!hasAdAssetReference(ad)) addMissing(missing, `ads[${index}].asset_links`);
     if (!isPresentString(ad.copy)) addMissing(missing, `ads[${index}].copy`);
-    if (requiresMetaConversionFields && !isPresentString(ad.destination_url)) {
-      addMissing(missing, `ads[${index}].destination_url`);
-    }
+    if (requiresMetaConversionFields && !isPresentString(ad.destination_url)) addMissing(missing, `ads[${index}].destination_url`);
     if (requiresVideoAssets && ad.asset_type !== "video" && ad.asset_type !== "spark_ad") {
       addMissing(missing, `ads[${index}].asset_type`);
     }
@@ -242,13 +242,47 @@ export function computeMissingFields(brief: JDWCampaignBrief): string[] {
   return Array.from(missing);
 }
 
+function normaliseBrief(brief: JDWCampaignBrief): JDWCampaignBrief {
+  return {
+    ...brief,
+    source: brief.source || {
+      source_type: null,
+      source_title: null,
+      source_date: null,
+      original_item_label: null,
+      source_notes: []
+    },
+    build: brief.build || {
+      action: "new_campaign",
+      existing_campaign_name: null,
+      approval_required: null,
+      launch_instruction: null,
+      priority: "normal"
+    },
+    campaign: {
+      ...brief.campaign,
+      asid: brief.campaign.asid ?? null,
+      campaign_notes: brief.campaign.campaign_notes ?? null
+    },
+    ad_sets: brief.ad_sets.map((adSet) => ({
+      ...adSet,
+      budget_amount: adSet.budget_amount ?? null,
+      budget_type: adSet.budget_type ?? null,
+      notes: adSet.notes ?? null,
+      ads: adSet.ads ?? []
+    })),
+    ads: brief.ads || []
+  };
+}
+
 function validatedBrief(brief: JDWCampaignBrief): ValidatedBrief {
-  const missingFields = computeMissingFields(brief);
+  const normalisedBrief = normaliseBrief(brief);
+  const missingFields = computeMissingFields(normalisedBrief);
 
   return {
-    brief,
+    brief: normalisedBrief,
     missingFields,
-    defaultStatus: defaultStatusForBrief(missingFields, brief.build)
+    defaultStatus: defaultStatusForBrief(normalisedBrief, missingFields)
   };
 }
 
@@ -258,10 +292,7 @@ export function validateBriefJson(rawJson: string): BriefValidationResult {
   try {
     parsed = JSON.parse(rawJson);
   } catch {
-    return {
-      ok: false,
-      message: "Invalid JSON. Ask Claude to output JDW_CAMPAIGN_BRIEF_V1 JSON only."
-    };
+    return { ok: false, message: "Invalid JSON. Ask Claude to output JDW_CAMPAIGN_BRIEF_V1 JSON only." };
   }
 
   if (
@@ -291,11 +322,7 @@ export function validateBriefJson(rawJson: string): BriefValidationResult {
       };
     }
 
-    return {
-      ok: true,
-      briefs: result.data.briefs.map(validatedBrief),
-      isBatch: true
-    };
+    return { ok: true, briefs: result.data.briefs.map(validatedBrief), isBatch: true };
   }
 
   const result = campaignBriefSchema.safeParse(parsed);
@@ -310,9 +337,5 @@ export function validateBriefJson(rawJson: string): BriefValidationResult {
     };
   }
 
-  return {
-    ok: true,
-    briefs: [validatedBrief(result.data)],
-    isBatch: false
-  };
+  return { ok: true, briefs: [validatedBrief(result.data)], isBatch: false };
 }

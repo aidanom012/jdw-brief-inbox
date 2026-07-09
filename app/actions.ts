@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAidan, requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { validateBriefJson } from "@/lib/brief-schema";
 import {
   createBrief,
@@ -82,7 +82,7 @@ export async function submitBriefAction(rawJson: string): Promise<SubmitBriefRes
 
 export async function updateBriefStatusAction(id: string, status: BriefStatus): Promise<void> {
   assertSameOriginRequest();
-  requireAidan();
+  requireUser();
   assertUuid(id);
 
   if (!isBriefStatus(status)) {
@@ -100,7 +100,7 @@ export async function toggleChecklistItemAction(
   completed: boolean
 ): Promise<void> {
   assertSameOriginRequest();
-  requireAidan();
+  requireUser();
   assertUuid(briefId);
   assertUuid(checklistItemId);
   await updateChecklistItem(checklistItemId, completed);
@@ -109,7 +109,7 @@ export async function toggleChecklistItemAction(
 
 export async function updateInternalNotesAction(briefId: string, internalNotes: string): Promise<void> {
   assertSameOriginRequest();
-  requireAidan();
+  requireUser();
   assertUuid(briefId);
 
   if (internalNotes.length > MAX_INTERNAL_NOTES_LENGTH) {
@@ -122,7 +122,7 @@ export async function updateInternalNotesAction(briefId: string, internalNotes: 
 
 export async function deleteBriefAction(briefId: string): Promise<void> {
   assertSameOriginRequest();
-  requireAidan();
+  requireUser();
   assertUuid(briefId);
   await deleteBrief(briefId);
   revalidatePath("/inbox");

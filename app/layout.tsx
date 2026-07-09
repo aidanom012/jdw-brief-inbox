@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME || "JDW Brief Inbox",
-  description: "Private campaign brief inbox for JDW campaign builds."
+  title: process.env.NEXT_PUBLIC_APP_NAME || "JDW Brief Builder",
+  description: "Private campaign brief builder for JDW campaign builds."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

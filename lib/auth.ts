@@ -6,11 +6,15 @@ export type UserRole = "aidan" | "james";
 
 const COOKIE_NAME = "jdw_brief_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const FULL_ACCESS_ROLE: UserRole = "aidan";
 
 function authSecret(): string {
   return (
     process.env.SESSION_SECRET ||
-    `${process.env.AIDAN_PASSCODE || ""}:${process.env.JAMES_PASSCODE || ""}` ||
+    process.env.JDW_PASSCODE ||
+    process.env.APP_PASSCODE ||
+    process.env.AIDAN_PASSCODE ||
+    process.env.JAMES_PASSCODE ||
     "jdw-brief-inbox-dev"
   );
 }
@@ -37,7 +41,7 @@ function secureStringEqual(a: string, b: string): boolean {
   return timingSafeEqual(aHash, bHash);
 }
 
-export function createSessionValue(role: UserRole): string {
+export function createSessionValue(role: UserRole = FULL_ACCESS_ROLE): string {
   return `${role}.${signRole(role)}`;
 }
 
@@ -68,15 +72,10 @@ export function requireUser(): UserRole {
 }
 
 export function requireAidan(): UserRole {
-  const role = requireUser();
-  if (role !== "aidan") {
-    redirect("/inbox");
-  }
-
-  return role;
+  return requireUser();
 }
 
-export function setSessionRole(role: UserRole): void {
+export function setSessionRole(role: UserRole = FULL_ACCESS_ROLE): void {
   cookies().set(COOKIE_NAME, createSessionValue(role), {
     httpOnly: true,
     sameSite: "lax",
@@ -97,14 +96,24 @@ export function clearSessionRole(): void {
   });
 }
 
+function configuredPasscodes(): string[] {
+  return [
+    process.env.JDW_PASSCODE,
+    process.env.APP_PASSCODE,
+    process.env.AIDAN_PASSCODE,
+    process.env.JAMES_PASSCODE
+  ].filter((value): value is string => Boolean(value && value.trim().length > 0));
+}
+
 export function roleFromPasscode(passcode: string): UserRole | null {
-  if (process.env.AIDAN_PASSCODE && secureStringEqual(passcode, process.env.AIDAN_PASSCODE)) {
-    return "aidan";
+  const cleanPasscode = passcode.trim();
+  const passcodes = configuredPasscodes();
+
+  if (passcodes.length === 0) {
+    return null;
   }
 
-  if (process.env.JAMES_PASSCODE && secureStringEqual(passcode, process.env.JAMES_PASSCODE)) {
-    return "james";
-  }
-
-  return null;
+  return passcodes.some((storedPasscode) => secureStringEqual(cleanPasscode, storedPasscode))
+    ? FULL_ACCESS_ROLE
+    : null;
 }
