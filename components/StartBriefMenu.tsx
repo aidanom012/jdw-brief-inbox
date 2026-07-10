@@ -228,13 +228,6 @@ export function StartBriefMenu({
     router.push("/new");
   }
 
-  function startFresh() {
-    window.localStorage.removeItem(AUTOSAVE_KEY);
-    setOptions([]);
-    closeMenu();
-    router.push("/new?start=fresh");
-  }
-
   function continueDraft(id: string) {
     closeMenu();
     router.push(`/new?resume=${encodeURIComponent(id)}`);
@@ -263,13 +256,8 @@ export function StartBriefMenu({
       {open ? (
         <div className="start-brief-dropdown animate-pop">
           <button type="button" className="start-brief-action start-brief-action-primary" onClick={startNewChoice}>
-            <span>New / AI import</span>
-            <small>paste notes</small>
-          </button>
-
-          <button type="button" className="start-brief-action" onClick={startFresh}>
-            <span>Blank manual brief</span>
-            <small>clear autosave</small>
+            <span>New</span>
+            <small>choose how to start</small>
           </button>
 
           <div className="start-brief-continue-block">
@@ -279,8 +267,8 @@ export function StartBriefMenu({
               onClick={() => setContinueOpen((current) => !current)}
               disabled={options.length === 0}
             >
-              <span>Continue unsaved</span>
-              <small>{options.length ? `${options.length} draft${options.length === 1 ? "" : "s"}` : "none"}</small>
+              <span>Continue</span>
+              <small>{options.length ? `${options.length} unsaved` : "none"}</small>
             </button>
 
             {continueOpen && options.length ? (

@@ -6,6 +6,10 @@ export type UserRole = "aidan" | "james";
 
 export const SESSION_COOKIE_NAME = "jdw_brief_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
+
+function sessionExpiryDate(): Date {
+  return new Date(Date.now() + COOKIE_MAX_AGE * 1000);
+}
 const FULL_ACCESS_ROLE: UserRole = "aidan";
 export const LOCAL_DEV_PASSCODE = "local-jdw";
 
@@ -82,6 +86,7 @@ export function setSessionRole(role: UserRole = FULL_ACCESS_ROLE): void {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: COOKIE_MAX_AGE,
+    expires: sessionExpiryDate(),
     priority: "high",
     path: "/"
   });
