@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       tokenUsage: result.usage || null,
       provider: result.provider,
       model: result.model,
+      attempts: result.attempts,
       message: result.validation.isBatch
         ? `${result.validation.briefs.length} briefs generated. Review before saving.`
         : "Brief generated. Review before saving."

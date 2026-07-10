@@ -7,7 +7,11 @@ import {
 } from "@/lib/brief-schema";
 
 const DEFAULT_PROVIDER = "groq";
-const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
+const DEFAULT_GROQ_MODEL_CHAIN = [
+  "openai/gpt-oss-120b",
+  "qwen/qwen3-32b",
+  "openai/gpt-oss-20b"
+];
 const DEFAULT_MAX_COMPLETION_TOKENS = 2048;
 const HARD_MAX_COMPLETION_TOKENS = 8192;
 export const MAX_RAW_AI_BRIEF_LENGTH = 50_000;
@@ -19,6 +23,12 @@ type AiUsageMetadata = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
+};
+
+type AiModelAttempt = {
+  model: string;
+  ok: boolean;
+  note: string;
 };
 
 type GroqChatCompletionResponse = {
@@ -110,6 +120,7 @@ export type AiBriefResult = {
   usage?: AiUsageMetadata;
   provider: string;
   model: string;
+  attempts: AiModelAttempt[];
 };
 
 export class AiBriefError extends Error {
@@ -517,8 +528,18 @@ function configuredProvider(): string {
   return (process.env.AI_PROVIDER || DEFAULT_PROVIDER).trim().toLowerCase();
 }
 
-function configuredGroqModel(): string {
-  return (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL).trim();
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function configuredGroqModels(): string[] {
+  const configuredChain = process.env.GROQ_MODEL_CHAIN || process.env.GROQ_MODELS;
+  if (configuredChain?.trim()) {
+    return uniqueStrings(configuredChain.split(","));
+  }
+
+  const legacyModel = process.env.GROQ_MODEL?.trim();
+  return uniqueStrings([...DEFAULT_GROQ_MODEL_CHAIN, legacyModel || ""]);
 }
 
 function configuredMaxCompletionTokens(): number {
@@ -613,20 +634,21 @@ async function postGroqChatCompletion(apiKey: string, body: JsonObject): Promise
   };
 }
 
-async function generateWithGroq(rawBrief: string): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string }> {
+async function generateWithGroqModel(rawBrief: string, model: string): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string; note: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new AiBriefError("Groq is not configured for this app yet. Add GROQ_API_KEY in Vercel/env.", 500);
   }
 
-  const model = configuredGroqModel();
   const facts = localFacts(rawBrief);
+  let retriedWithoutJsonMode = false;
   let { response, payload } = await postGroqChatCompletion(
     apiKey,
     groqRequestBody(model, rawBrief, facts, true)
   );
 
   if (!response.ok && shouldRetryWithoutGroqJsonMode(response, payload)) {
+    retriedWithoutJsonMode = true;
     ({ response, payload } = await postGroqChatCompletion(
       apiKey,
       groqRequestBody(model, rawBrief, facts, false)
@@ -655,11 +677,20 @@ async function generateWithGroq(rawBrief: string): Promise<{ generated: unknown;
   return {
     generated: payloadToJdwPayload(parsed, rawBrief),
     usage: groqUsageToAiUsage(typedPayload.usage),
-    model
+    model,
+    note: retriedWithoutJsonMode
+      ? "Generated after retrying without Groq JSON mode."
+      : "Generated with Groq JSON mode."
   };
 }
 
-function validateGeneratedBrief(generated: unknown, usage: AiUsageMetadata | undefined, provider: string, model: string): AiBriefResult {
+function validateGeneratedBrief(
+  generated: unknown,
+  usage: AiUsageMetadata | undefined,
+  provider: string,
+  model: string,
+  attempts: AiModelAttempt[]
+): AiBriefResult {
   const rawGeneratedJson = JSON.stringify(generated);
   const validation = validateBriefJson(rawGeneratedJson);
 
@@ -672,7 +703,8 @@ function validateGeneratedBrief(generated: unknown, usage: AiUsageMetadata | und
     validation,
     usage,
     provider,
-    model
+    model,
+    attempts
   };
 }
 
@@ -683,6 +715,38 @@ export async function generateAiBrief(rawBrief: string): Promise<AiBriefResult> 
     throw new AiBriefError(`Unsupported AI_PROVIDER "${provider}". Set AI_PROVIDER=groq.`, 500);
   }
 
-  const result = await generateWithGroq(rawBrief);
-  return validateGeneratedBrief(result.generated, result.usage, "groq", result.model);
+  const attempts: AiModelAttempt[] = [];
+  const models = configuredGroqModels();
+
+  for (const model of models) {
+    try {
+      const result = await generateWithGroqModel(rawBrief, model);
+      const successfulAttempt = { model, ok: true, note: result.note };
+      return validateGeneratedBrief(result.generated, result.usage, "groq", result.model, [
+        ...attempts,
+        successfulAttempt
+      ]);
+    } catch (error) {
+      if (!(error instanceof AiBriefError)) {
+        attempts.push({ model, ok: false, note: "Unexpected AI parser failure." });
+        continue;
+      }
+
+      if (error.message.includes("not configured")) {
+        throw error;
+      }
+
+      attempts.push({
+        model,
+        ok: false,
+        note: [error.message, ...(error.issues || []).slice(0, 1)].join(" ")
+      });
+    }
+  }
+
+  throw new AiBriefError(
+    "Groq could not generate a valid brief with any configured model.",
+    502,
+    attempts.map((attempt) => `${attempt.model}: ${attempt.note}`)
+  );
 }

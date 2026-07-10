@@ -15,11 +15,11 @@ This build uses **Groq** as the primary AI provider:
 ```env
 AI_PROVIDER=groq
 GROQ_API_KEY=
-GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MODEL_CHAIN=openai/gpt-oss-120b,qwen/qwen3-32b,openai/gpt-oss-20b
 GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 
-The frontend sends only the pasted raw brief to `/api/ai/brief`. The backend calls Groq server-side using Groq JSON mode. Groq returns a compact extraction object, and the backend expands it locally into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape.
+The frontend sends only the pasted raw brief to `/api/ai/brief`. The backend calls Groq server-side using a model chain: `openai/gpt-oss-120b`, then `qwen/qwen3-32b`, then `openai/gpt-oss-20b`. Each model gets JSON mode first and a non-JSON-mode retry if Groq rejects its own JSON generation. Groq returns a compact extraction object, and the backend expands it locally into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape.
 
 The old `/api/gemini/brief` route remains only as a compatibility wrapper to `/api/ai/brief` so older UI calls do not break during deploys.
 
@@ -40,7 +40,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 SESSION_SECRET=
 AI_PROVIDER=groq
 GROQ_API_KEY=
-GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MODEL_CHAIN=openai/gpt-oss-120b,qwen/qwen3-32b,openai/gpt-oss-20b
 GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 

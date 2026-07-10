@@ -8,6 +8,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { submitBriefAction, updateBriefAction } from "@/app/actions";
 import {
@@ -15,8 +16,20 @@ import {
   type BriefValidationResult,
   type JDWCampaignBrief,
 } from "@/lib/brief-schema";
-import { BriefFunnelView } from "@/components/BriefFunnelView";
 import { AiBriefPanel } from "@/components/AiBriefPanel";
+
+const BriefFunnelView = dynamic(
+  () => import("@/components/BriefFunnelView").then((mod) => mod.BriefFunnelView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="funnel-loading pixel-card p-4">
+        <p className="pixel-label">Live funnel</p>
+        <strong>Loading preview...</strong>
+      </div>
+    ),
+  },
+);
 
 const MAX_JSON_FILE_LENGTH = 250_000;
 const AUTOSAVE_KEY = "jdw.manualBriefDraft.v2";
@@ -94,9 +107,11 @@ type CampaignQueueItem = {
   brief: JDWCampaignBrief;
   label: string;
   slide: number;
-  status: "pending" | "saved";
+  status: "pending" | "saved" | "skipped";
   savedId?: string;
 };
+
+type CampaignTemplateId = "meta_streaming" | "meta_views" | "tiktok_spark";
 
 const PLATFORM_OPTIONS = ["Meta", "TikTok", "YouTube", "Other"] as const;
 const CURRENCY_OPTIONS = [
@@ -231,24 +246,24 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
     if (slide === 2) {
       return {
         eyebrow: "Meta playbook",
-        title: "Meta builds use Campaign → Ad Set → Ad.",
-        body: "The Meta walkthrough separates campaign-level decisions, ad-set decisions, and ad-level decisions.",
-        bullets: ["Campaign: account, objective, budget", "Ad set: flight time, audience, placements", "Ad: format, Page/IG, creative and copy"],
+        title: "Meta builds use Campaign -> Ad Set -> Ad.",
+        body: "The Meta guide separates campaign-level decisions, ad-set decisions, and ad-level decisions.",
+        bullets: ["Campaign: name, objective, daily or total budget", "Ad set: flight time, audience, placements, budget", "Ad: format, Page/IG identity, creative and copy"],
       };
     }
     if (slide === 4) {
       return {
         eyebrow: "Campaign level",
         title: "Match the objective to what James actually wants.",
-        body: "Meta’s objective choice controls delivery. Use traffic/video views/engagement/sales/conversions according to the actual goal.",
-        bullets: ["Streaming click campaign = Website / conversion-style setup", "Views campaign = Video Views or ThruPlay", "Sales/store work = conversion objective and pixel/dataset"],
+        body: "Meta objective choice controls delivery. Low-signal campaigns should move up the funnel rather than forcing a conversion objective with too little data.",
+        bullets: ["Streaming click campaign = Traffic or Website conversion-style setup", "Views campaign = Video Views or ThruPlay", "Conversions need enough signal and can re-enter learning after major edits"],
       };
     }
     if (slide === 5) {
       return {
         eyebrow: "Tracking check",
         title: "Pixel/dataset only matters when the objective needs it.",
-        body: "Conversion-style Meta campaigns need the right pixel/dataset and optimisation event. Awareness or video-view builds may not.",
+        body: "Meta conversion objectives require Pixel or CAPI. Awareness, traffic, and video-view builds may not.",
         bullets: ["Confirm conversion location", "Confirm optimisation event", "Confirm pixel/dataset name"],
       };
     }
@@ -256,8 +271,8 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
       return {
         eyebrow: "Ad set level",
         title: "This is where audience and placements live.",
-        body: "Use this step for locations, age, gender, interest/retargeting/LAL notes, exclusions, and placement decisions.",
-        bullets: ["Flight time / schedule", "Audience targeting", "Placements and exclusions"],
+        body: "Use this step for locations, age, gender, interest/custom/lookalike notes, exclusions, and placement decisions.",
+        bullets: ["Targeting: geographic, demographic, interest, custom, lookalike", "Placements: automatic is the efficiency default", "Consolidate where possible to avoid stretching budget too thin"],
       };
     }
     if (slide === 10) {
@@ -265,7 +280,7 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
         eyebrow: "Ad level",
         title: "This is where creative, page/IG, copy, and URL live.",
         body: "Keep asset links, post URLs, copy, and destination URLs attached to the exact ad they belong to.",
-        bullets: ["Creative format", "Page / Instagram post", "Copy and destination URL"],
+        bullets: ["Creative format and placement fit", "Page / Instagram post identity", "CTA, copy, destination URL, and fatigue risk"],
       };
     }
   }
@@ -274,24 +289,24 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
     if (slide === 2) {
       return {
         eyebrow: "TikTok playbook",
-        title: "TikTok builds use Campaign → Ad Group → Ad.",
+        title: "TikTok builds use Campaign -> Ad Group -> Ad.",
         body: "The TikTok guide separates campaign, ad group, and ad setup. The site mirrors that but still saves to the JDW ad_set structure underneath.",
-        bullets: ["Campaign: objective and budget", "Ad group: placement, targeting, budget", "Ad: Spark code, asset, copy, URL"],
+        bullets: ["Campaign: objective", "Ad group: promotion type, placements, targeting, budget, bidding", "Ad: Spark/non-Spark identity, format, asset, copy, URL"],
       };
     }
     if (slide === 4) {
       return {
         eyebrow: "Campaign level",
         title: "Pick the TikTok objective first.",
-        body: "For James briefs this is usually Video Views, Traffic, Website Conversions, Engagement, or Followers.",
-        bullets: ["Video Views: 15-sec engaged view / view optimisation", "Traffic/conversions: needs destination and event", "Spark/boost: needs post URL or boost code"],
+        body: "For James briefs this is usually Video Views, Website Traffic, Engagement, Lead/Conversion, or Followers.",
+        bullets: ["Video Views: 15-sec engaged view / view optimisation", "Website campaigns need promotion type Website", "Spark/boost work needs post URL or boost code"],
       };
     }
     if (slide === 5) {
       return {
         eyebrow: "Tracking/event check",
         title: "Skip tracking for simple view/Spark boosts unless James specifies an event.",
-        body: "For website or conversion campaigns, capture pixel/event details here. For video views, move on if not supplied.",
+        body: "For website or conversion campaigns, capture promotion type, pixel/event, and destination. For video views, move on if not supplied.",
         bullets: ["Website conversions need pixel/event", "Spark/video views need post URL or boost code", "Do not invent missing tracking"],
       };
     }
@@ -300,15 +315,15 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
         eyebrow: "Ad group level",
         title: "This is the TikTok ad group setup.",
         body: "Use this step for TikTok locations, age, targeting, placements, optimisation notes, and optional ad group budget.",
-        bullets: ["Audience and territory", "Placement and optimisation", "Budget split if not campaign-level"],
+        bullets: ["Ad group names must be unique inside a campaign", "Automatic placement is the recommended default", "Placements cannot be changed after the ad group is created"],
       };
     }
     if (slide === 10) {
       return {
         eyebrow: "Ad level",
         title: "Spark codes and post URLs belong here.",
-        body: "Attach every boost code, TikTok post URL, asset link, copy line, and destination URL to its exact ad.",
-        bullets: ["Spark/boost code", "TikTok post URL", "Asset/copy/destination"],
+        body: "Attach every boost code, TikTok post URL, asset link, identity note, copy line, and destination URL to its exact ad.",
+        bullets: ["Spark or non-Spark identity", "Single video, image, carousel, playable, or collection format", "Asset/copy/destination"],
       };
     }
   }
@@ -900,6 +915,51 @@ function slideForMissingField(field: string): number {
   return 11;
 }
 
+function completionScore(missingFields: string[]): number {
+  if (missingFields.length === 0) return 100;
+  return Math.max(32, 100 - missingFields.length * 9);
+}
+
+function missingFieldsForSlide(missingFields: string[], slide: number): string[] {
+  return missingFields.filter((field) => slideForMissingField(field) === slide);
+}
+
+function queueStatusLabel(status: CampaignQueueItem["status"], isActive: boolean): string {
+  if (status === "saved") return "saved";
+  if (status === "skipped") return "skipped";
+  return isActive ? "editing" : "pending";
+}
+
+function buildBatchJson(briefs: JDWCampaignBrief[]): string {
+  return JSON.stringify(
+    {
+      brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
+      briefs,
+    },
+    null,
+    2,
+  );
+}
+
+function isCompleteQueueBrief(brief: JDWCampaignBrief): boolean {
+  const validation = validateBriefJson(JSON.stringify(brief));
+  return validation.ok && validation.briefs[0]?.missingFields.length === 0;
+}
+
+function sourceEvidenceRows(setup: CampaignSetup, adSets: WizardAdSet[], ads: WizardAd[]) {
+  return [
+    ["Artist", setup.artist],
+    ["Project", setup.release_title],
+    ["Platform", setup.platform],
+    ["Account", setup.account],
+    ["ACID", setup.acid],
+    ["Budget", setup.budget_amount ? `${setup.currency || ""} ${setup.budget_amount}`.trim() : ""],
+    ["Dates", [setup.start_date, setup.end_date].filter(Boolean).join(" to ")],
+    ["Audiences", adSets.length ? String(adSets.length) : ""],
+    ["Ads", ads.length ? String(ads.length) : ""],
+  ].filter(([, value]) => value);
+}
+
 function MissingInfoCoach({
   missingFields,
   onEditField,
@@ -1167,6 +1227,7 @@ function CampaignQueueBar({
 
   const activeIndex = queue.findIndex((item) => item.id === activeId);
   const savedCount = queue.filter((item) => item.status === "saved").length;
+  const skippedCount = queue.filter((item) => item.status === "skipped").length;
 
   return (
     <section className="campaign-queue-bar">
@@ -1177,21 +1238,25 @@ function CampaignQueueBar({
         </div>
         <span className="campaign-queue-count">{savedCount}/{queue.length} saved</span>
       </div>
+      {skippedCount > 0 ? (
+        <p className="campaign-queue-note">{skippedCount} skipped campaign{skippedCount === 1 ? "" : "s"} kept out of the save run.</p>
+      ) : null}
       <div className="campaign-queue-list" role="tablist" aria-label="AI imported campaigns">
         {queue.map((item, index) => {
           const isActive = item.id === activeId;
           const isSaved = item.status === "saved";
+          const isSkipped = item.status === "skipped";
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onSelect(item.id)}
-              disabled={isSaved}
-              className={`campaign-queue-chip ${isActive ? "campaign-queue-chip-active" : ""} ${isSaved ? "campaign-queue-chip-saved" : ""}`}
+              disabled={isSaved || isSkipped}
+              className={`campaign-queue-chip ${isActive ? "campaign-queue-chip-active" : ""} ${isSaved ? "campaign-queue-chip-saved" : ""} ${isSkipped ? "campaign-queue-chip-skipped" : ""}`}
             >
               <span className="campaign-queue-number">{index + 1}</span>
               <span className="campaign-queue-name">{item.label}</span>
-              <span className="campaign-queue-status">{isSaved ? "saved" : isActive ? "editing" : "pending"}</span>
+              <span className="campaign-queue-status">{queueStatusLabel(item.status, isActive)}</span>
             </button>
           );
         })}
@@ -1200,6 +1265,205 @@ function CampaignQueueBar({
         Switch between pending campaigns anytime. Your current edits are kept in the queue. Saving moves to the next pending campaign.
       </p>
     </section>
+  );
+}
+
+function BuilderStepRail({
+  slide,
+  setup,
+  missingFields,
+  onSelect,
+}: {
+  slide: number;
+  setup: CampaignSetup;
+  missingFields: string[];
+  onSelect: (slide: number) => void;
+}) {
+  return (
+    <section className="builder-step-rail pixel-window">
+      <div className="builder-rail-heading">
+        <p className="pixel-label">Build path</p>
+        <strong>{slide + 1}/{SLIDES.length}</strong>
+      </div>
+      <div className="builder-step-list">
+        {SLIDES.map((item, index) => {
+          const missingCount = missingFieldsForSlide(missingFields, index).length;
+          const isActive = index === slide;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => onSelect(index)}
+              className={`builder-step-item ${isActive ? "builder-step-item-active" : ""} ${missingCount ? "builder-step-item-missing" : ""}`}
+            >
+              <span className="builder-step-index">{String(index + 1).padStart(2, "0")}</span>
+              <span>
+                <strong>{slideLabelForPlatform(index, setup.platform)}</strong>
+                <small>{missingCount ? `${missingCount} missing` : index < slide ? "checked" : item.hint}</small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function QueueActionPanel({
+  hasQueue,
+  readyCount,
+  pendingCount,
+  canDuplicatePrevious,
+  isPending,
+  onSaveAllComplete,
+  onSkip,
+  onDuplicatePrevious,
+}: {
+  hasQueue: boolean;
+  readyCount: number;
+  pendingCount: number;
+  canDuplicatePrevious: boolean;
+  isPending: boolean;
+  onSaveAllComplete: () => void;
+  onSkip: () => void;
+  onDuplicatePrevious: () => void;
+}) {
+  if (!hasQueue) return null;
+
+  return (
+    <section className="queue-action-panel pixel-window">
+      <p className="pixel-label">Batch tools</p>
+      <h3>{pendingCount} pending</h3>
+      <div className="grid gap-2">
+        <button
+          type="button"
+          className="pixel-button text-xs disabled:opacity-50"
+          onClick={onSaveAllComplete}
+          disabled={isPending || readyCount === 0}
+        >
+          Save all complete ({readyCount})
+        </button>
+        <button type="button" className="mini-button" onClick={onDuplicatePrevious} disabled={!canDuplicatePrevious}>
+          Duplicate previous
+        </button>
+        <button type="button" className="mini-button danger" onClick={onSkip}>
+          Skip campaign
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function CampaignTemplatePanel({
+  setup,
+  onApplyTemplate,
+}: {
+  setup: CampaignSetup;
+  onApplyTemplate: (template: CampaignTemplateId) => void;
+}) {
+  const activePlatform = setup.platform || "Meta";
+
+  return (
+    <section className="builder-side-card">
+      <div className="builder-side-card-heading">
+        <p className="pixel-label">Smart templates</p>
+        <span>{activePlatform}</span>
+      </div>
+      <div className="template-button-grid">
+        <button type="button" onClick={() => onApplyTemplate("meta_streaming")}>
+          <strong>Meta streaming</strong>
+          <span>Website conversions</span>
+        </button>
+        <button type="button" onClick={() => onApplyTemplate("meta_views")}>
+          <strong>Meta views</strong>
+          <span>ThruPlay setup</span>
+        </button>
+        <button type="button" onClick={() => onApplyTemplate("tiktok_spark")}>
+          <strong>TikTok Spark</strong>
+          <span>Boost code ready</span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function SourceEvidencePanel({
+  setup,
+  adSets,
+  ads,
+}: {
+  setup: CampaignSetup;
+  adSets: WizardAdSet[];
+  ads: WizardAd[];
+}) {
+  const rows = sourceEvidenceRows(setup, adSets, ads);
+
+  return (
+    <section className="builder-side-card">
+      <div className="builder-side-card-heading">
+        <p className="pixel-label">Captured evidence</p>
+        <span>{rows.length}</span>
+      </div>
+      {rows.length ? (
+        <div className="evidence-list">
+          {rows.map(([label, value]) => (
+            <p key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="builder-empty-note">The right signals will appear as the brief fills in.</p>
+      )}
+    </section>
+  );
+}
+
+function BuilderInsightPanel({
+  setup,
+  adSets,
+  ads,
+  missingFields,
+  onEditMissing,
+  onApplyTemplate,
+}: {
+  setup: CampaignSetup;
+  adSets: WizardAdSet[];
+  ads: WizardAd[];
+  missingFields: string[];
+  onEditMissing: (field: string) => void;
+  onApplyTemplate: (template: CampaignTemplateId) => void;
+}) {
+  const score = completionScore(missingFields);
+
+  return (
+    <aside className="builder-right-rail">
+      <section className="builder-side-card confidence-card">
+        <div className="builder-side-card-heading">
+          <p className="pixel-label">Build confidence</p>
+          <span>{score}%</span>
+        </div>
+        <div className="confidence-track">
+          <span style={{ width: `${score}%` }} />
+        </div>
+        <p>{missingFields.length ? `${missingFields.length} items still need a decision.` : "Ready to save."}</p>
+      </section>
+
+      <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
+
+      <MissingInfoCoach missingFields={missingFields} onEditField={onEditMissing} />
+
+      <SourceEvidencePanel setup={setup} adSets={adSets} ads={ads} />
+
+      <section className="builder-side-card live-funnel-card">
+        <div className="builder-side-card-heading">
+          <p className="pixel-label">Live funnel</p>
+          <span>{adSets.length}:{ads.length}</span>
+        </div>
+        <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
+      </section>
+    </aside>
   );
 }
 
@@ -1312,8 +1576,29 @@ export function NewBriefForm({
   const queueTotal = campaignQueue.length;
   const hasCampaignQueue = queueTotal > 1 && activeQueueIndex >= 0;
   const hasNextQueuedCampaign = hasCampaignQueue
-    ? campaignQueue.some((item) => item.id !== activeQueueId && item.status !== "saved")
+    ? campaignQueue.some((item) => item.id !== activeQueueId && item.status === "pending")
     : false;
+  const queueDraftSnapshot = useMemo(() => {
+    if (!activeQueueId) return campaignQueue;
+    const draftBrief = buildBrief(setup, adSets, ads) as JDWCampaignBrief;
+    return campaignQueue.map((item, index) =>
+      item.id === activeQueueId && item.status === "pending"
+        ? {
+            ...item,
+            brief: draftBrief,
+            label: queueLabelForBrief(draftBrief, index),
+            slide,
+          }
+        : item,
+    );
+  }, [campaignQueue, activeQueueId, setup, adSets, ads, slide]);
+  const queueReadyCount = hasCampaignQueue
+    ? queueDraftSnapshot.filter((item) => item.status === "pending" && isCompleteQueueBrief(item.brief)).length
+    : 0;
+  const queuePendingCount = hasCampaignQueue
+    ? queueDraftSnapshot.filter((item) => item.status === "pending").length
+    : 0;
+  const canDuplicatePreviousCampaign = hasCampaignQueue && activeQueueIndex > 0;
 
   useEffect(() => {
     if (briefId || initialBrief) {
@@ -1347,7 +1632,10 @@ export function NewBriefForm({
         if (typeof parsed.slide === "number") setSlide(Math.max(0, Math.min(SLIDES.length - 1, parsed.slide)));
         if (parsed.buildMode === "manual" || parsed.buildMode === "ai") setBuildMode(parsed.buildMode);
         if (Array.isArray(parsed.campaignQueue) && parsed.campaignQueue.length > 0) {
-          setCampaignQueue(parsed.campaignQueue);
+          setCampaignQueue(parsed.campaignQueue.map((item) => ({
+            ...item,
+            status: item.status === "saved" || item.status === "skipped" ? item.status : "pending",
+          })));
           setActiveQueueId(parsed.activeQueueId || parsed.campaignQueue[0]?.id || null);
         }
         setAutosaveMessage("Autosave restored");
@@ -1376,6 +1664,12 @@ export function NewBriefForm({
   function clearImport() {
     setImportedJson(null);
     setImportedValidation(null);
+  }
+
+  function scrollBuilderToTop() {
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
 
   function currentBuilderBrief(): JDWCampaignBrief {
@@ -1412,7 +1706,7 @@ export function NewBriefForm({
   function selectQueuedCampaign(id: string) {
     if (id === activeQueueId) return;
     const target = campaignQueue.find((item) => item.id === id);
-    if (!target || target.status === "saved") return;
+    if (!target || target.status !== "pending") return;
     persistActiveQueueDraft();
     setActiveQueueId(id);
     loadBriefIntoBuilder(target.brief);
@@ -1441,6 +1735,7 @@ export function NewBriefForm({
       setBuildMode("ai");
       setSlide(0);
       setAutosaveMessage(`${message}; review from step 1`);
+      scrollBuilderToTop();
       return;
     }
 
@@ -1451,6 +1746,7 @@ export function NewBriefForm({
     setBuildMode("ai");
     setSlide(0);
     setAutosaveMessage(`${generatedBriefs.length} campaigns queued. Review 1 of ${generatedBriefs.length}.`);
+    scrollBuilderToTop();
   }
 
   function updateSetup<K extends keyof CampaignSetup>(
@@ -1528,7 +1824,7 @@ export function NewBriefForm({
         ? [
             ...queueBeforeSave.slice(Math.max(0, activeIndexBeforeSave + 1)),
             ...queueBeforeSave.slice(0, Math.max(0, activeIndexBeforeSave)),
-          ].find((item) => item.id !== activeIdBeforeSave && item.status !== "saved")
+          ].find((item) => item.id !== activeIdBeforeSave && item.status === "pending")
         : undefined;
 
     startTransition(async () => {
@@ -1575,6 +1871,156 @@ export function NewBriefForm({
     });
   }
 
+  function saveAllCompleteQueuedCampaigns() {
+    if (!hasCampaignQueue || briefId) return;
+    setSubmitError(null);
+
+    const completeItems = queueDraftSnapshot.filter(
+      (item) => item.status === "pending" && isCompleteQueueBrief(item.brief),
+    );
+
+    if (completeItems.length === 0) {
+      setSubmitError("No queued campaigns are complete enough to batch save yet.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await submitBriefAction(buildBatchJson(completeItems.map((item) => item.brief)));
+      if (!result.ok) {
+        setSubmitError(result.message);
+        return;
+      }
+
+      const savedIds = new Map(completeItems.map((item, index) => [item.id, result.ids[index]]));
+      const nextQueue = queueDraftSnapshot.map((item, index) =>
+        savedIds.has(item.id)
+          ? {
+              ...item,
+              label: queueLabelForBrief(item.brief, index),
+              status: "saved" as const,
+              savedId: savedIds.get(item.id),
+              slide: SLIDES.length - 1,
+            }
+          : item,
+      );
+      const nextPending = nextQueue.find((item) => item.status === "pending");
+
+      setCampaignQueue(nextQueue);
+
+      if (nextPending) {
+        setActiveQueueId(nextPending.id);
+        loadBriefIntoBuilder(nextPending.brief);
+        setSlide(nextPending.slide || 0);
+        setBuildMode("ai");
+        setAutosaveMessage(`Saved ${completeItems.length}. Next: ${nextPending.label}`);
+        return;
+      }
+
+      window.localStorage.removeItem(AUTOSAVE_KEY);
+      router.push("/inbox");
+    });
+  }
+
+  function skipQueuedCampaign() {
+    if (!hasCampaignQueue || !activeQueueId) return;
+    const nextQueue = queueDraftSnapshot.map((item) =>
+      item.id === activeQueueId && item.status === "pending"
+        ? { ...item, status: "skipped" as const, slide }
+        : item,
+    );
+    const nextPending = nextQueue.find((item) => item.status === "pending");
+    setCampaignQueue(nextQueue);
+
+    if (nextPending) {
+      setActiveQueueId(nextPending.id);
+      loadBriefIntoBuilder(nextPending.brief);
+      setSlide(nextPending.slide || 0);
+      setAutosaveMessage(`Skipped. Next: ${nextPending.label}`);
+      return;
+    }
+
+    window.localStorage.removeItem(AUTOSAVE_KEY);
+    router.push("/inbox");
+  }
+
+  function duplicatePreviousQueuedCampaign() {
+    if (!hasCampaignQueue || !activeQueueId || activeQueueIndex <= 0) return;
+    const previous = queueDraftSnapshot
+      .slice(0, activeQueueIndex)
+      .reverse()
+      .find((item) => item.status !== "skipped");
+
+    if (!previous) return;
+
+    loadBriefIntoBuilder(previous.brief);
+    setCampaignQueue((current) =>
+      current.map((item, index) =>
+        item.id === activeQueueId && item.status === "pending"
+          ? {
+              ...item,
+              brief: previous.brief,
+              label: queueLabelForBrief(previous.brief, index),
+              slide: 0,
+            }
+          : item,
+      ),
+    );
+    setSlide(0);
+    setAutosaveMessage(`Duplicated settings from ${previous.label}`);
+  }
+
+  function applyCampaignTemplate(template: CampaignTemplateId) {
+    clearImport();
+    const templateSetup: Record<CampaignTemplateId, Partial<CampaignSetup>> = {
+      meta_streaming: {
+        platform: "Meta",
+        objective: "Streaming Conversions",
+        campaign_type: "Sales",
+        conversion_location: "Website",
+        optimisation_event: "ViewContent",
+        budget_type: "campaign_total",
+        currency: "GBP",
+      },
+      meta_views: {
+        platform: "Meta",
+        objective: "Video Views / ThruPlay",
+        campaign_type: "Video Views",
+        conversion_location: "None",
+        optimisation_event: "ThruPlay",
+        budget_type: "campaign_total",
+        currency: "GBP",
+      },
+      tiktok_spark: {
+        platform: "TikTok",
+        objective: "Video Views / 15-sec engaged view",
+        campaign_type: "Spark / Video Views",
+        conversion_location: "None",
+        optimisation_event: "15-sec engaged view",
+        budget_type: "campaign_total",
+        currency: "GBP",
+      },
+    };
+
+    const templatePlacements: Record<CampaignTemplateId, string> = {
+      meta_streaming: "Instagram Reels\nInstagram Stories\nFacebook Reels\nFeed",
+      meta_views: "Instagram Reels\nInstagram Stories\nFacebook Reels",
+      tiktok_spark: "TikTok feed\nSpark Ads",
+    };
+
+    setSetup((current) => ({
+      ...current,
+      ...templateSetup[template],
+    }));
+    setAdSets((current) =>
+      current.map((adSet) => ({
+        ...adSet,
+        placements: adSet.placements || templatePlacements[template],
+        targeting_type: adSet.targeting_type && adSet.targeting_type !== "unknown" ? adSet.targeting_type : "broad",
+      })),
+    );
+    setAutosaveMessage("Template applied");
+  }
+
   function startManualBuild() {
     clearImport();
     setCampaignQueue([]);
@@ -1582,6 +2028,7 @@ export function NewBriefForm({
     setBuildMode("manual");
     setSlide(0);
     setSubmitError(null);
+    scrollBuilderToTop();
   }
 
   function backToStartChoice() {
@@ -1590,6 +2037,41 @@ export function NewBriefForm({
     setInfoOpen(false);
     setSubmitError(null);
   }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        Boolean(target?.isContentEditable);
+
+      if (isTyping) return;
+
+      if (event.altKey && event.key === "ArrowRight") {
+        event.preventDefault();
+        nextSlide();
+      }
+
+      if (event.altKey && event.key === "ArrowLeft") {
+        event.preventDefault();
+        previousSlide();
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        if (slide < SLIDES.length - 1) {
+          nextSlide();
+        } else if (!isPending) {
+          submitBrief();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   if (buildMode === "choice" && !briefId && !initialBrief) {
     return (
@@ -1603,81 +2085,62 @@ export function NewBriefForm({
   }
 
   return (
-    <div className="one-by-one-builder">
+    <div className="one-by-one-builder builder-console">
       <BuilderModeBanner mode={buildMode} onBackToStart={backToStartChoice} />
-      <CampaignQueueBar
-        queue={campaignQueue}
-        activeId={activeQueueId}
-        onSelect={selectQueuedCampaign}
-      />
-      <div className="pixel-window p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="pixel-label">
-              Step {slide + 1} of {SLIDES.length}
-            </p>
-            <h2 className="mt-1 text-3xl font-black tracking-tight">
-              {currentSlideLabel}
-            </h2>
-            <p className="mt-1 text-sm font-semibold pixel-muted">
-              {currentSlideHint}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              className={`mini-button ${infoOpen ? "safe" : ""}`}
-              onClick={() => setInfoOpen((current) => !current)}
-            >
-              {infoOpen ? "Hide info" : "Show info"}
-            </button>
-            {autosaveMessage ? <span className="autosave-chip">{autosaveMessage}</span> : null}
-            {!briefId ? (
-              <button type="button" className="mini-button" onClick={clearAutosave}>
-                Clear autosave
-              </button>
-            ) : null}
-            <SummaryStrip setup={setup} adSets={adSets} ads={ads} />
-          </div>
-        </div>
-        <div className="mt-4 h-4 border-3 border-black bg-white">
-          <div
-            className="h-full bg-[#eb5160] transition-all duration-300"
-            style={{ width: `${((slide + 1) / SLIDES.length) * 100}%` }}
-          />
-        </div>
-        <div className="mt-4 hidden gap-2 lg:flex">
-          {SLIDES.map((item, index) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => {
-                persistActiveQueueDraft(index);
-                setSlide(index);
-              }}
-              className={`step-dot ${index === slide ? "step-dot-active" : ""}`}
-              aria-label={`Go to ${slideLabelForPlatform(index, setup.platform)}`}
-            />
-          ))}
-        </div>
-        <WizardControls
-          slide={slide}
-          onBack={previousSlide}
-          onSkip={nextSlide}
-          onNext={nextSlide}
-          onSubmit={submitBrief}
-          isPending={isPending}
-          briefId={briefId}
-          importedJson={importedJson}
-          queueTotal={queueTotal}
-          hasNextQueuedCampaign={hasNextQueuedCampaign}
-        />
-      </div>
 
-      <div
-        className={`builder-workspace ${infoOpen ? "builder-workspace-open" : ""}`}
-      >
-        <div key={slide} className="swipe-card pixel-window p-5 sm:p-8">
+      <div className="builder-console-grid">
+        <aside className="builder-left-rail">
+          <CampaignQueueBar
+            queue={campaignQueue}
+            activeId={activeQueueId}
+            onSelect={selectQueuedCampaign}
+          />
+          <BuilderStepRail
+            slide={slide}
+            setup={setup}
+            missingFields={missingFields}
+            onSelect={(index) => {
+              persistActiveQueueDraft(index);
+              setSlide(index);
+            }}
+          />
+          <QueueActionPanel
+            hasQueue={hasCampaignQueue}
+            readyCount={queueReadyCount}
+            pendingCount={queuePendingCount}
+            canDuplicatePrevious={canDuplicatePreviousCampaign}
+            isPending={isPending}
+            onSaveAllComplete={saveAllCompleteQueuedCampaigns}
+            onSkip={skipQueuedCampaign}
+            onDuplicatePrevious={duplicatePreviousQueuedCampaign}
+          />
+        </aside>
+
+        <main className="builder-main-panel">
+          <section className="builder-command-header pixel-window p-4 sm:p-5">
+            <div className="builder-command-copy">
+              <p className="pixel-label">
+                Step {slide + 1} of {SLIDES.length}
+              </p>
+              <h2>{currentSlideLabel}</h2>
+              <p>{currentSlideHint}</p>
+            </div>
+            <div className="builder-command-meta">
+              {autosaveMessage ? <span className="autosave-chip">{autosaveMessage}</span> : null}
+              {!briefId ? (
+                <button type="button" className="mini-button" onClick={clearAutosave}>
+                  Clear autosave
+                </button>
+              ) : null}
+              <SummaryStrip setup={setup} adSets={adSets} ads={ads} />
+            </div>
+            <div className="builder-progress-track">
+              <span style={{ width: `${((slide + 1) / SLIDES.length) * 100}%` }} />
+            </div>
+          </section>
+
+          <div className="builder-workspace builder-workspace-console">
+            <div key={slide} className="swipe-card builder-question-card pixel-window p-5 sm:p-8">
           {currentPlaybookGuide ? <PlaybookGuideCard guide={currentPlaybookGuide} /> : null}
           {slide === 0 ? (
             <section className="simple-question">
@@ -2531,16 +2994,33 @@ export function NewBriefForm({
               ) : null}
             </section>
           ) : null}
-        </div>
-        {infoOpen ? (
-          <ActiveInfoPanel
-            slide={slide}
-            setup={setup}
-            adSets={adSets}
-            ads={ads}
-            onClose={() => setInfoOpen(false)}
-          />
-        ) : null}
+            </div>
+          </div>
+        </main>
+
+        <BuilderInsightPanel
+          setup={setup}
+          adSets={adSets}
+          ads={ads}
+          missingFields={missingFields}
+          onEditMissing={(field) => setSlide(slideForMissingField(field))}
+          onApplyTemplate={applyCampaignTemplate}
+        />
+      </div>
+
+      <div className="builder-bottom-dock">
+        <WizardControls
+          slide={slide}
+          onBack={previousSlide}
+          onSkip={nextSlide}
+          onNext={nextSlide}
+          onSubmit={submitBrief}
+          isPending={isPending}
+          briefId={briefId}
+          importedJson={importedJson}
+          queueTotal={queueTotal}
+          hasNextQueuedCampaign={hasNextQueuedCampaign}
+        />
       </div>
     </div>
   );

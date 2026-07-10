@@ -21,6 +21,12 @@ type AiTokenUsage = {
   totalTokenCount?: number;
 };
 
+type AiModelAttempt = {
+  model: string;
+  ok: boolean;
+  note: string;
+};
+
 type AiApiResult =
   | {
       ok: true;
@@ -30,6 +36,9 @@ type AiApiResult =
       missingFields: string[];
       message: string;
       tokenUsage?: AiTokenUsage | null;
+      provider?: string;
+      model?: string;
+      attempts?: AiModelAttempt[];
     }
   | {
       ok: false;
@@ -66,6 +75,8 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [tokenUsage, setTokenUsage] = useState<AiTokenUsage | null>(null);
+  const [modelUsed, setModelUsed] = useState<string | null>(null);
+  const [modelAttempts, setModelAttempts] = useState<AiModelAttempt[]>([]);
   const characterCount = rawBrief.trim().length;
 
   function loadBrief(brief: JDWCampaignBrief, message: string) {
@@ -79,6 +90,8 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
     setError(null);
     setSuccess(null);
     setTokenUsage(null);
+    setModelUsed(null);
+    setModelAttempts([]);
 
     if (!cleanBrief) {
       setError("Paste a raw brief first.");
@@ -107,6 +120,8 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
       }
 
       setTokenUsage(result.tokenUsage || null);
+      setModelUsed(result.model || null);
+      setModelAttempts(result.attempts || []);
 
       const validation = validateGeneratedPayload(result.generated);
       if (validation.briefs.length > 1) {
@@ -151,9 +166,29 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
 
       <div className="mt-4 grid gap-3">
         <div className="import-mode-row">
-          <span className="mode-pill mode-pill-active">Groq auto-build</span>
+          <span className="mode-pill mode-pill-active">Groq model ladder</span>
           <span className="mode-pill">Manual edit after import</span>
           <span className="mode-pill">Ask James what is missing</span>
+        </div>
+        <div className={`ai-pipeline ${isGenerating ? "ai-pipeline-active" : ""}`}>
+          {(modelAttempts.length > 0
+            ? modelAttempts
+            : [
+                { model: "openai/gpt-oss-120b", ok: false, note: "Primary parser" },
+                { model: "qwen/qwen3-32b", ok: false, note: "JSON stability fallback" },
+                { model: "openai/gpt-oss-20b", ok: false, note: "Fast final fallback" }
+              ]).map((attempt, index) => (
+            <span
+              key={`${attempt.model}-${index}`}
+              className={`ai-pipeline-step ${
+                attempt.ok ? "ai-pipeline-step-done" : modelAttempts.length ? "ai-pipeline-step-failed" : ""
+              }`}
+              title={attempt.note}
+            >
+              <span>{index + 1}</span>
+              {attempt.model.replace("openai/", "").replace("qwen/", "")}
+            </span>
+          ))}
         </div>
         <textarea
           value={rawBrief}
@@ -177,6 +212,11 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
         {success ? (
           <p className="pixel-ready p-3 text-sm font-black" aria-live="polite">
             {success}
+            {modelUsed ? (
+              <span className="mt-1 block text-xs">
+                Model used: {modelUsed}
+              </span>
+            ) : null}
             {tokenUsage?.totalTokenCount ? (
               <span className="mt-1 block text-xs">
                 Groq usage: {tokenUsage.promptTokenCount?.toLocaleString() || "?"} in / {tokenUsage.candidatesTokenCount?.toLocaleString() || "?"} out / {tokenUsage.totalTokenCount.toLocaleString()} total tokens
