@@ -2372,3 +2372,353 @@ body::before {
   .folder-shell .folder-card { width: 100% !important; }
   .folder-delete { opacity: 1 !important; }
 }
+
+/* 2026-07 folder/contrast repair: high-contrast Finder, fixed folder icons, readable tabs. */
+:root {
+  --bg: #0b0d0f !important;
+  --ink: #08090a !important;
+  --paper: #ffffff !important;
+  --paper-2: #f5f5f2 !important;
+  --wash: #eeeeea !important;
+  --line: #08090a !important;
+  --accent: #eb5160 !important;
+  --accent-soft: #fff3f4 !important;
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255,255,255,.07), transparent 30%),
+    linear-gradient(135deg, #070809 0%, #121518 55%, #070809 100%) !important;
+  color: #ffffff !important;
+}
+
+body::before {
+  opacity: .11 !important;
+  background: radial-gradient(circle at 1px 1px, rgba(255,255,255,.7) 1px, transparent 1.5px) !important;
+  background-size: 22px 22px !important;
+  mask-image: linear-gradient(to bottom, black, transparent 88%) !important;
+}
+
+/* Keep the soft desktop shell, but force every control to be readable. */
+.top-shell { background: transparent !important; border-bottom: 0 !important; }
+.brand-mark,
+.top-nav .nav-chip {
+  background: #ffffff !important;
+  color: #08090a !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.18) !important;
+}
+.brand-mark:hover,
+.top-nav .nav-chip:hover {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+  transform: translateY(-2px) !important;
+}
+
+.pixel-window,
+.pixel-card,
+.pixel-ad-card,
+.pixel-stat,
+.pixel-panel,
+.pixel-detail-panel,
+.folder-campaign-screen,
+.desktop-screen,
+.empty-desktop-panel {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,.035) 1px, transparent 1.35px),
+    #ffffff !important;
+  background-size: 18px 18px, auto !important;
+  color: #08090a !important;
+  border: 2px solid #08090a !important;
+  box-shadow: 0 28px 70px rgba(0,0,0,.24), 0 1px 0 rgba(255,255,255,.8) inset !important;
+}
+
+.pixel-window::before,
+.desktop-titlebar {
+  background: #f5f5f2 !important;
+  border-bottom: 2px solid #08090a !important;
+}
+
+/* Buttons/tabs: no beige-on-beige. */
+.pixel-button,
+.mini-button.safe,
+.nav-chip-active,
+.pixel-tab-active,
+.pixel-node-active {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #08090a !important;
+}
+
+.nav-chip,
+.mini-button,
+.pixel-tab,
+.pixel-flow-chip,
+.quick-summary span,
+.autosave-chip,
+.field,
+.choice-card {
+  background: #ffffff !important;
+  color: #08090a !important;
+  border-color: #08090a !important;
+}
+
+.folder-tabs .nav-chip {
+  background: #ffffff !important;
+  color: #08090a !important;
+  border: 2px solid #08090a !important;
+  border-radius: 12px !important;
+  min-width: 110px !important;
+  text-align: center !important;
+}
+.folder-tabs .nav-chip-active {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #08090a !important;
+}
+.folder-tabs .nav-chip:hover {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #08090a !important;
+}
+
+.pixel-button:hover,
+.mini-button:hover,
+.pixel-tab:hover,
+.choice-card:hover,
+.pixel-node:hover {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #08090a !important;
+  transform: translateY(-2px) !important;
+}
+
+.mini-button.danger,
+.folder-delete:hover {
+  background: #eb5160 !important;
+  color: #ffffff !important;
+  border-color: #eb5160 !important;
+}
+
+/* Desktop layout: more robust spacing and no pseudo elements escaping the tile. */
+.desktop-screen,
+.folder-campaign-screen {
+  width: min(calc(100% - 2rem), 1660px) !important;
+  margin-inline: auto !important;
+  min-height: calc(100vh - 170px) !important;
+  padding: 0 clamp(1.4rem, 3.6vw, 4.5rem) clamp(3.5rem, 6vw, 6rem) !important;
+  overflow: visible !important;
+}
+
+.desktop-icon-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 190px)) !important;
+  gap: clamp(4.5rem, 7vw, 7.25rem) clamp(3.8rem, 6vw, 6.75rem) !important;
+  align-items: start !important;
+  padding: 0 clamp(.5rem, 2vw, 2rem) 6rem !important;
+}
+
+.folder-shell,
+.folder-shell.desktop-folder {
+  width: 190px !important;
+  min-height: 250px !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.folder-card,
+.folder-shell .folder-card {
+  width: 190px !important;
+  min-height: 250px !important;
+  padding: 18px 12px 16px !important;
+  border: 2px solid transparent !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  color: #08090a !important;
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+}
+
+.folder-card:hover,
+.folder-card:focus-visible {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border-color: #08090a !important;
+  transform: translateY(-5px) !important;
+  box-shadow: 0 22px 46px rgba(0,0,0,.18) !important;
+}
+
+/* Folder icon is entirely inside its own box now. No negative tab, no clipping. */
+.folder-icon {
+  position: relative !important;
+  display: block !important;
+  width: 132px !important;
+  height: 106px !important;
+  margin: 4px auto 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+.folder-icon::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 1 !important;
+  left: 9px !important;
+  top: 10px !important;
+  width: 56px !important;
+  height: 24px !important;
+  border: 3px solid #08090a !important;
+  border-bottom: 0 !important;
+  border-radius: 9px 9px 0 0 !important;
+  background: #ffffff !important;
+}
+
+.folder-icon::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 2 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 31px !important;
+  bottom: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  border: 3px solid #08090a !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+}
+
+.folder-icon span {
+  display: block !important;
+  position: absolute !important;
+  z-index: 3 !important;
+  left: 22px !important;
+  right: 22px !important;
+  top: 66px !important;
+  height: 24px !important;
+  border: 3px solid #08090a !important;
+  border-radius: 5px !important;
+  background: #ffffff !important;
+}
+
+.folder-card:hover .folder-icon::before,
+.folder-card:hover .folder-icon::after,
+.folder-card:hover .folder-icon span,
+.folder-card:focus-visible .folder-icon::before,
+.folder-card:focus-visible .folder-icon::after,
+.folder-card:focus-visible .folder-icon span {
+  border-color: #ffffff !important;
+  background: #08090a !important;
+}
+
+.folder-name {
+  max-width: 174px !important;
+  margin-top: 1.15rem !important;
+  color: currentColor !important;
+  font-size: 1.08rem !important;
+  line-height: 1.08 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.folder-count,
+.folder-preview {
+  max-width: 174px !important;
+  color: rgba(8,9,10,.68) !important;
+}
+.folder-card:hover .folder-count,
+.folder-card:hover .folder-preview,
+.folder-card:focus-visible .folder-count,
+.folder-card:focus-visible .folder-preview {
+  color: rgba(255,255,255,.78) !important;
+}
+
+.folder-delete {
+  top: 4px !important;
+  right: 4px !important;
+  width: 30px !important;
+  height: 30px !important;
+  border: 2px solid #08090a !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: #08090a !important;
+  opacity: 0 !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,.12) !important;
+}
+.folder-shell:hover .folder-delete,
+.folder-shell:focus-within .folder-delete { opacity: 1 !important; }
+
+/* Completed folders never get crossed out or visually broken. Campaigns get a badge only. */
+.folder-card-completed,
+.folder-shell-completed,
+.folder-card-completed .folder-icon,
+.folder-card-completed .folder-icon::before,
+.folder-card-completed .folder-icon::after,
+.folder-card-completed .folder-icon span {
+  outline: none !important;
+  text-decoration: none !important;
+}
+.folder-card-completed .folder-title-text,
+.folder-card-completed .folder-project-text {
+  text-decoration: none !important;
+}
+.campaign-card-completed .campaign-title-text,
+.campaign-card-completed .campaign-project-text {
+  text-decoration: none !important;
+}
+.campaign-card-completed::after {
+  background: #08090a !important;
+  color: #ffffff !important;
+  border: 2px solid #08090a !important;
+  border-radius: 999px !important;
+}
+
+/* Status badges always readable. */
+.completed-chip,
+[class*="bg-[#eb5160]"] {
+  background: #08090a !important;
+  color: #ffffff !important;
+}
+
+.folder-campaign-screen .pixel-window,
+.folder-campaign-screen .pixel-card,
+.folder-campaign-screen .pixel-panel {
+  background: #ffffff !important;
+  color: #08090a !important;
+}
+.folder-campaign-screen .grid.lg\:grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)) !important;
+  gap: 2rem !important;
+}
+
+@media (max-width: 900px) {
+  .desktop-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(165px, 165px)) !important;
+    gap: 3.5rem 2rem !important;
+  }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 165px !important; }
+  .folder-icon { width: 122px !important; height: 98px !important; }
+}
+
+@media (max-width: 640px) {
+  .desktop-screen,
+  .folder-campaign-screen { width: calc(100% - .8rem) !important; padding-inline: 1rem !important; }
+  .desktop-icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 2.75rem 1rem !important; }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 100% !important; }
+  .folder-delete { opacity: 1 !important; }
+}
