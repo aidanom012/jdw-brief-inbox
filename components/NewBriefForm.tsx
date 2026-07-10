@@ -1585,8 +1585,6 @@ function BuilderInsightPanel({
         <p>{missingFields.length ? `${missingFields.length} items still need a decision.` : "Ready to save."}</p>
       </section>
 
-      <MissingInfoCoach missingFields={missingFields} onEditField={onEditMissing} />
-
       <BuilderRailDrawer eyebrow="Advanced tools" title="Smart templates" meta={setup.platform || "Tools"}>
         <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
       </BuilderRailDrawer>

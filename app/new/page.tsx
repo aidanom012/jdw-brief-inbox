@@ -19,7 +19,7 @@ export default async function NewBriefPage() {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-[1320px] px-4 py-8 sm:px-6">
+      <main className="w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
         <NewBriefForm savedArtists={savedArtists} savedProjects={savedProjects} />
       </main>
     </>
