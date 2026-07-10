@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { StartBriefMenu } from "@/components/StartBriefMenu";
 import type { BriefRow } from "@/lib/db";
 import { DeleteArtistFolderButton } from "@/components/DeleteArtistFolderButton";
 
@@ -43,9 +44,7 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
             Open an artist folder to see their campaigns. New briefs automatically save into the matching folder.
           </p>
         </div>
-        <Link href="/new" className="pixel-button focus-ring desktop-new-button">
-          + Start new brief
-        </Link>
+        <StartBriefMenu label="+ Start new brief" variant="desktop" />
       </div>
 
       {groups.length === 0 ? (

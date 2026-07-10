@@ -98,6 +98,8 @@ type NewBriefFormProps = {
   briefId?: string;
   savedArtists?: string[];
   savedProjects?: string[];
+  initialStart?: "choice" | "fresh";
+  resumeDraftId?: string | null;
 };
 
 type BuildMode = "choice" | "manual" | "ai";
@@ -951,8 +953,8 @@ function autosaveDraftMeta(slide = 0, updatedAt?: string): string {
 function autosaveContinueOptions(snapshot: AutosaveSnapshot | null): AutosaveContinueOption[] {
   if (!snapshot) return [];
 
-  const pendingQueue = (snapshot.campaignQueue || []).filter((item) => item.status === "pending");
-  if (pendingQueue.length > 0) {
+  if (Array.isArray(snapshot.campaignQueue) && snapshot.campaignQueue.length > 0) {
+    const pendingQueue = snapshot.campaignQueue.filter((item) => item.status === "pending");
     return pendingQueue.map((item, index) => ({
       id: item.id,
       label: item.label || autosaveDraftLabel(item.brief?.campaign, `Campaign ${index + 1}`),
@@ -971,7 +973,9 @@ function autosaveContinueOptions(snapshot: AutosaveSnapshot | null): AutosaveCon
 }
 
 function autosaveIsMeaningful(snapshot: AutosaveSnapshot): boolean {
-  if ((snapshot.campaignQueue || []).some((item) => item.status === "pending")) return true;
+  if (Array.isArray(snapshot.campaignQueue) && snapshot.campaignQueue.length > 0) {
+    return snapshot.campaignQueue.some((item) => item.status === "pending");
+  }
   if (setupHasContent(snapshot.setup)) return true;
   if ((snapshot.adSets || []).some(adSetHasContent)) return true;
   if ((snapshot.ads || []).some(adHasContent)) return true;
@@ -1747,11 +1751,13 @@ function EntryChoiceScreen({
   autosaveOptions,
   onManual,
   onContinueDraft,
+  onDeleteDraft,
   onGenerated,
 }: {
   autosaveOptions: AutosaveContinueOption[];
   onManual: () => void;
   onContinueDraft: (id: string) => void;
+  onDeleteDraft: (id: string) => void;
   onGenerated: (
     json: string,
     validation: Extract<BriefValidationResult, { ok: true }>,
@@ -1778,15 +1784,24 @@ function EntryChoiceScreen({
             </p>
             <div className="autosave-option-list">
               {autosaveOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="autosave-option-card"
-                  onClick={() => onContinueDraft(option.id)}
-                >
-                  <span>{option.label}</span>
-                  <small>{option.meta}</small>
-                </button>
+                <div key={option.id} className="autosave-option-row">
+                  <button
+                    type="button"
+                    className="autosave-option-card"
+                    onClick={() => onContinueDraft(option.id)}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.meta}</small>
+                  </button>
+                  <button
+                    type="button"
+                    className="autosave-option-delete"
+                    aria-label={`Delete ${option.label} autosave`}
+                    onClick={() => onDeleteDraft(option.id)}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           </article>
@@ -1823,6 +1838,8 @@ export function NewBriefForm({
   briefId,
   savedArtists = [],
   savedProjects = [],
+  initialStart = "choice",
+  resumeDraftId = null,
 }: NewBriefFormProps) {
   const router = useRouter();
   const initialState = useMemo(
@@ -1830,7 +1847,7 @@ export function NewBriefForm({
     [initialBrief],
   );
   const [slide, setSlide] = useState(0);
-  const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief ? "manual" : "choice");
+  const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief || initialStart === "fresh" ? "manual" : "choice");
   const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
   const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
   const [ads, setAds] = useState<WizardAd[]>(initialState.ads);
@@ -1849,6 +1866,7 @@ export function NewBriefForm({
   const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
   const [autosaveSnapshot, setAutosaveSnapshot] = useState<AutosaveSnapshot | null>(null);
   const autosaveSuppressedRef = useRef(false);
+  const routeActionAppliedRef = useRef(false);
   const [isPending, startTransition] = useTransition();
 
   const adSetIds = useMemo(() => adSets.map((adSet) => adSet.id), [adSets]);
@@ -1933,6 +1951,26 @@ export function NewBriefForm({
   }, [briefId, initialBrief]);
 
   useEffect(() => {
+    if (briefId || initialBrief || !isAutosaveLoaded || routeActionAppliedRef.current) return;
+
+    if (initialStart === "fresh") {
+      routeActionAppliedRef.current = true;
+      startManualBuild();
+      return;
+    }
+
+    if (resumeDraftId) {
+      routeActionAppliedRef.current = true;
+      if (autosaveSnapshot && autosaveContinueOptions(autosaveSnapshot).some((option) => option.id === resumeDraftId)) {
+        continueAutosaveDraft(resumeDraftId);
+      } else {
+        setBuildMode("choice");
+        setAutosaveMessage("No unfinished autosave found");
+      }
+    }
+  }, [briefId, initialBrief, isAutosaveLoaded, initialStart, resumeDraftId, autosaveSnapshot]);
+
+  useEffect(() => {
     if (!isAutosaveLoaded || briefId || initialBrief || buildMode === "choice" || autosaveSuppressedRef.current) return;
     const timeout = window.setTimeout(() => {
       const nextSnapshot: AutosaveSnapshot = {
@@ -1963,6 +2001,31 @@ export function NewBriefForm({
     window.localStorage.removeItem(AUTOSAVE_KEY);
     setAutosaveSnapshot(null);
     setAutosaveMessage("Autosave cleared");
+  }
+
+  function deleteAutosaveDraft(id: string) {
+    if (!autosaveSnapshot) return;
+
+    if (Array.isArray(autosaveSnapshot.campaignQueue) && autosaveSnapshot.campaignQueue.length > 0) {
+      const nextSnapshot: AutosaveSnapshot = {
+        ...autosaveSnapshot,
+        campaignQueue: autosaveSnapshot.campaignQueue.filter((item) => item.id !== id),
+        activeQueueId: autosaveSnapshot.activeQueueId === id ? null : autosaveSnapshot.activeQueueId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (autosaveContinueOptions(nextSnapshot).length === 0) {
+        clearAutosave();
+        return;
+      }
+
+      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(nextSnapshot));
+      setAutosaveSnapshot(nextSnapshot);
+      setAutosaveMessage("Unfinished draft deleted");
+      return;
+    }
+
+    clearAutosave();
   }
 
   function resetBuilderToBlank() {
@@ -2472,6 +2535,7 @@ export function NewBriefForm({
         autosaveOptions={continueOptions}
         onManual={startManualBuild}
         onContinueDraft={continueAutosaveDraft}
+        onDeleteDraft={deleteAutosaveDraft}
         onGenerated={(json, validation, message) =>
           applyValidatedJson(json, validation, message)
         }

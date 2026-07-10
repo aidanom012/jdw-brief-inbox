@@ -10,7 +10,14 @@ function unique(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))).sort();
 }
 
-export default async function NewBriefPage() {
+type NewBriefPageProps = {
+  searchParams?: {
+    start?: string;
+    resume?: string;
+  };
+};
+
+export default async function NewBriefPage({ searchParams }: NewBriefPageProps) {
   const role = requireUser();
   const briefs = isSupabaseConfigured() ? await getBriefs() : [];
   const savedArtists = unique(briefs.map((brief) => brief.artist));
@@ -20,7 +27,12 @@ export default async function NewBriefPage() {
     <>
       <TopBar role={role} />
       <main className="w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-        <NewBriefForm savedArtists={savedArtists} savedProjects={savedProjects} />
+        <NewBriefForm
+          savedArtists={savedArtists}
+          savedProjects={savedProjects}
+          initialStart={searchParams?.start === "fresh" ? "fresh" : "choice"}
+          resumeDraftId={searchParams?.resume || null}
+        />
       </main>
     </>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { UserRole } from "@/lib/auth";
+import { StartBriefMenu } from "@/components/StartBriefMenu";
 
 type TopBarProps = {
   role: UserRole;
@@ -16,9 +17,7 @@ export function TopBar(_props: TopBarProps) {
           <Link href="/inbox" className="nav-chip focus-ring">
             Inbox
           </Link>
-          <Link href="/new" className="nav-chip focus-ring">
-            New
-          </Link>
+          <StartBriefMenu label="New" variant="nav" />
           <Link href="/logout" className="nav-chip focus-ring">
             Log out
           </Link>

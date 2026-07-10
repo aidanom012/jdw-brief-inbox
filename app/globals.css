@@ -4707,3 +4707,167 @@ main:has(.builder-console) {
     top: 1rem;
   }
 }
+
+/* Start-new dropdown: fresh brief first, continue only when local autosave exists. */
+.start-brief-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  z-index: 80;
+}
+
+.start-brief-menu-nav .start-brief-trigger {
+  height: 100%;
+}
+
+.start-brief-dropdown {
+  position: absolute;
+  top: calc(100% + .55rem);
+  right: 0;
+  display: grid;
+  min-width: 240px;
+  gap: .45rem;
+  border: 2px solid rgba(18,20,22,.16);
+  border-radius: 22px;
+  background: rgba(255,255,255,.96);
+  color: #101216;
+  padding: .65rem;
+  box-shadow: 0 22px 70px rgba(18,20,22,.16);
+  backdrop-filter: blur(14px);
+}
+
+.start-brief-menu-desktop .start-brief-dropdown {
+  min-width: 290px;
+}
+
+.start-brief-action {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 2px solid rgba(18,20,22,.12);
+  border-radius: 14px;
+  background: #fff;
+  padding: .75rem .85rem;
+  text-align: left;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.start-brief-action:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: #121416;
+  background: #f5efe5;
+}
+
+.start-brief-action:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.start-brief-action span,
+.start-brief-continue-row span {
+  font-size: .82rem;
+  font-weight: 950;
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+}
+
+.start-brief-action small,
+.start-brief-continue-row small {
+  flex: 0 0 auto;
+  color: rgba(16,18,22,.52);
+  font-size: .62rem;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.start-brief-continue-block {
+  display: grid;
+  gap: .45rem;
+}
+
+.start-brief-continue-list {
+  display: grid;
+  gap: .4rem;
+  border-left: 3px solid rgba(18,20,22,.16);
+  margin-left: .65rem;
+  padding-left: .65rem;
+}
+
+.start-brief-continue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: .35rem;
+  align-items: stretch;
+}
+
+.start-brief-continue-row > button:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  border: 2px solid rgba(18,20,22,.1);
+  border-radius: 12px;
+  background: #f7f8fb;
+  padding: .65rem .75rem;
+  text-align: left;
+}
+
+.start-brief-continue-row > button:first-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-brief-continue-row > button:first-child:hover {
+  border-color: #121416;
+  background: #fff;
+}
+
+.start-brief-delete,
+.autosave-option-delete {
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(18,20,22,.12);
+  border-radius: 12px;
+  background: #fff;
+  color: #101216;
+  font-size: 1.1rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.start-brief-delete:hover,
+.autosave-option-delete:hover {
+  background: #121416;
+  color: #fff;
+  border-color: #121416;
+}
+
+.autosave-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: .5rem;
+  align-items: stretch;
+}
+
+.autosave-option-row .autosave-option-card {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .start-brief-menu,
+  .start-brief-trigger {
+    width: 100%;
+  }
+
+  .start-brief-dropdown {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+}
