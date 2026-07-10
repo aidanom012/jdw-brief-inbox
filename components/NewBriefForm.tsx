@@ -78,7 +78,6 @@ type CampaignSetup = {
   platform: Platform;
   account: string;
   acid: string;
-  asid: string;
   objective: string;
   campaign_type: string;
   conversion_location: string;
@@ -415,6 +414,36 @@ function numberOrNull(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function padDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function normaliseDateForInput(value: string | null | undefined): string {
+  const clean = (value || "").trim();
+  if (!clean) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+
+  const ukMatch = clean.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/);
+  if (!ukMatch) return "";
+
+  const day = Number(ukMatch[1]);
+  const month = Number(ukMatch[2]);
+  let year = Number(ukMatch[3]);
+  if (year < 100) year += 2000;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return "";
+  }
+
+  return `${year}-${padDatePart(month)}-${padDatePart(day)}`;
+}
+
+
 function splitList(value: string): string[] {
   return value
     .split(/[\n,]+/)
@@ -455,19 +484,43 @@ function newAd(label = "", adSetIds: string[] = []): WizardAd {
   };
 }
 
-function duplicateAdSet(adSet: WizardAdSet): WizardAdSet {
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isPlainIndexedLabel(label: string | undefined, prefix: string): boolean {
+  const clean = (label || "").trim();
+  if (!clean) return true;
+  return new RegExp(`^${escapeRegex(prefix)}\\s+\\d+$`, "i").test(clean);
+}
+
+function nextSequentialLabel<T extends { label: string }>(items: T[], prefix: string): string {
+  const pattern = new RegExp(`^${escapeRegex(prefix)}\\s+(\\d+)$`, "i");
+  const highestExisting = items.reduce((highest, item) => {
+    const match = item.label.trim().match(pattern);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `${prefix} ${Math.max(highestExisting, items.length) + 1}`;
+}
+
+function duplicateLabel<T extends { label: string }>(items: T[], sourceLabel: string, prefix: string): string {
+  const clean = sourceLabel.trim();
+  return isPlainIndexedLabel(clean, prefix) ? nextSequentialLabel(items, prefix) : `${clean || prefix} copy`;
+}
+
+function duplicateAdSet(adSet: WizardAdSet, label: string): WizardAdSet {
   return {
     ...adSet,
     id: uid("adset"),
-    label: `${adSet.label || "Ad set"} copy`,
+    label,
   };
 }
 
-function duplicateAd(ad: WizardAd): WizardAd {
+function duplicateAd(ad: WizardAd, label: string): WizardAd {
   return {
     ...ad,
     id: uid("ad"),
-    label: `${ad.label || "Ad"} copy`,
+    label,
   };
 }
 
@@ -477,7 +530,6 @@ const EMPTY_SETUP: CampaignSetup = {
   platform: "",
   account: "",
   acid: "",
-  asid: "",
   objective: "",
   campaign_type: "",
   conversion_location: "",
@@ -553,7 +605,6 @@ function buildBrief(
       artist: blankToNull(setup.artist),
       release_title: blankToNull(setup.release_title),
       acid: blankToNull(setup.acid),
-      asid: blankToNull(setup.asid),
       platform: blankToEnum(setup.platform),
       account: blankToNull(setup.account),
       objective: blankToNull(setup.objective),
@@ -605,6 +656,18 @@ function FieldShell({
 
 function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`field ${props.className || ""}`} />;
+}
+
+function DateInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  const value = typeof props.value === "string" ? normaliseDateForInput(props.value) : "";
+  return (
+    <input
+      {...props}
+      type="date"
+      value={value}
+      className={`field date-field ${props.className || ""}`}
+    />
+  );
 }
 
 function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -745,7 +808,6 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
     platform: (brief.campaign.platform || "") as Platform,
     account: brief.campaign.account || "",
     acid: brief.campaign.acid || "",
-    asid: brief.campaign.asid || "",
     objective: brief.campaign.objective || "",
     campaign_type: brief.campaign.campaign_type || "",
     conversion_location: brief.campaign.conversion_location || "",
@@ -1083,7 +1145,7 @@ function slideForMissingField(field: string): number {
   if (field.includes("artist")) return 0;
   if (field.includes("release_title")) return 1;
   if (field.includes("platform")) return 2;
-  if (field.includes("account") || field.includes("acid") || field.includes("asid")) return 3;
+  if (field.includes("account") || field.includes("acid")) return 3;
   if (field.includes("objective") || field.includes("campaign_type")) return 4;
   if (field.includes("conversion_location") || field.includes("optimisation_event") || field.includes("pixel")) return 5;
   if (field.includes("budget") || field.includes("start_date") || field.includes("end_date")) return 6;
@@ -1135,6 +1197,101 @@ function sourceEvidenceRows(setup: CampaignSetup, adSets: WizardAdSet[], ads: Wi
     ["Audiences", adSets.length ? String(adSets.length) : ""],
     ["Ads", ads.length ? String(ads.length) : ""],
   ].filter(([, value]) => value);
+}
+
+type CriticalBuildWarning = {
+  field: string;
+  title: string;
+  detail: string;
+};
+
+function hasText(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0 && value.trim().toLowerCase() !== "unknown";
+}
+
+function containsAny(value: string | null | undefined, terms: string[]): boolean {
+  const clean = (value || "").toLowerCase();
+  return terms.some((term) => clean.includes(term));
+}
+
+function adHasCreative(ad: WizardAd): boolean {
+  return hasText(ad.asset_links) || hasText(ad.post_url) || hasText(ad.boost_code);
+}
+
+function criticalBuildWarnings(setup: CampaignSetup, adSets: WizardAdSet[], ads: WizardAd[]): CriticalBuildWarning[] {
+  const warnings: CriticalBuildWarning[] = [];
+  const add = (field: string, title: string, detail: string) => {
+    if (!warnings.some((warning) => warning.field === field)) warnings.push({ field, title, detail });
+  };
+
+  if (!hasText(setup.account)) add("campaign.account", "Ad account missing", "Pick the exact account before build.");
+  if (!hasText(setup.acid)) add("campaign.acid", "ACID missing", "This is the only campaign ID field.");
+  if (!setup.platform) add("campaign.platform", "Platform missing", "Meta, TikTok, YouTube, or Other.");
+  if (!hasText(setup.objective)) add("campaign.objective", "Objective missing", "Needed before choosing campaign setup.");
+  if (!hasText(setup.budget_amount) || !setup.budget_type || !setup.currency) {
+    add("budget.amount", "Budget incomplete", "Amount, type, and currency must be clear.");
+  }
+  if (!hasText(setup.start_date) || !hasText(setup.end_date)) {
+    add("campaign.start_date", "Dates missing", "Start and end date need confirming.");
+  }
+
+  const terms = adSetUnit(setup.platform);
+  if (adSets.length === 0) {
+    add("ad_sets", `${terms.singular} missing`, "At least one audience/ad group is needed.");
+  } else if (adSets.some((adSet) => !hasText(adSet.locations) && !hasText(adSet.notes))) {
+    add("ad_sets[0].targeting_details", `${terms.singular} details missing`, "Location/targeting notes need checking.");
+  }
+
+  if (ads.length === 0) {
+    add("ads", "Ads missing", "At least one ad/creative is needed.");
+  } else if (ads.some((ad) => !adHasCreative(ad))) {
+    add("ads[0].asset_links", "Creative missing", "Need asset link, post URL, or boost code.");
+  }
+
+  const looksLikeMetaConversion =
+    setup.platform === "Meta" &&
+    (containsAny(setup.objective, ["conversion", "stream", "sales"]) ||
+      containsAny(setup.campaign_type, ["conversion", "stream", "sales"]));
+
+  if (looksLikeMetaConversion) {
+    if (!hasText(setup.pixel)) add("campaign.pixel", "Pixel missing", "Meta conversion/streaming builds need the right pixel.");
+    if (!hasText(setup.optimisation_event)) add("campaign.optimisation_event", "Event missing", "Confirm ViewContent, FeatureFM_click, purchase, etc.");
+    if (ads.some((ad) => !hasText(ad.destination_url))) {
+      add("ads[0].destination_url", "Destination URL missing", "Conversion ads need a link to send people to.");
+    }
+  }
+
+  return warnings.slice(0, 6);
+}
+
+function LaunchBlockerPanel({
+  warnings,
+  onEditField,
+}: {
+  warnings: CriticalBuildWarning[];
+  onEditField: (field: string) => void;
+}) {
+  return (
+    <section className={`builder-side-card launch-blocker-card ${warnings.length === 0 ? "launch-blocker-card-ready" : ""}`}>
+      <div className="builder-side-card-heading">
+        <p className="pixel-label">Hey btw</p>
+        <span>{warnings.length ? `${warnings.length} blocker${warnings.length === 1 ? "" : "s"}` : "clear"}</span>
+      </div>
+      <h4>{warnings.length ? "Do not build until these are clear." : "Core build blockers are clear."}</h4>
+      {warnings.length ? (
+        <div className="launch-blocker-list">
+          {warnings.map((warning) => (
+            <button key={warning.field} type="button" onClick={() => onEditField(warning.field)}>
+              <strong>{warning.title}</strong>
+              <small>{warning.detail}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p>The remaining checks are taste/review decisions, not obvious build blockers.</p>
+      )}
+    </section>
+  );
 }
 
 function MissingInfoCoach({
@@ -1721,6 +1878,7 @@ function BuilderInsightPanel({
 }) {
   const score = completionScore(missingFields);
   const evidenceCount = sourceEvidenceRows(setup, adSets, ads).length;
+  const blockers = criticalBuildWarnings(setup, adSets, ads);
 
   return (
     <aside className="builder-right-rail">
@@ -1734,6 +1892,8 @@ function BuilderInsightPanel({
         </div>
         <p>{missingFields.length ? `${missingFields.length} items still need a decision.` : "Ready to save."}</p>
       </section>
+
+      <LaunchBlockerPanel warnings={blockers} onEditField={onEditMissing} />
 
       <BuilderRailDrawer eyebrow="Advanced tools" title="Smart templates" meta={setup.platform || "Tools"}>
         <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
@@ -2674,7 +2834,7 @@ export function NewBriefForm({
             <section className="simple-question">
               <p className="pixel-label">Account + ACID</p>
               <h3>What account and ACID?</h3>
-              <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
+              <div className="mx-auto mt-6 grid max-w-3xl gap-4 md:grid-cols-2">
                 <FieldShell label="Account">
                   <TextInput
                     value={setup.account}
@@ -2689,16 +2849,9 @@ export function NewBriefForm({
                     placeholder="80JPUI"
                   />
                 </FieldShell>
-                <FieldShell label="ASID">
-                  <TextInput
-                    value={setup.asid}
-                    onChange={(e) => updateSetup("asid", e.target.value)}
-                    placeholder="ASID if supplied"
-                  />
-                </FieldShell>
               </div>
               <p className="helper-copy">
-                If James has not given ACID or ASID yet, hit Skip.
+                If James has not given ACID yet, hit Skip.
               </p>
             </section>
           ) : null}
@@ -2831,21 +2984,15 @@ export function NewBriefForm({
                   </SelectInput>
                 </FieldShell>
                 <FieldShell label="Start date">
-                  <TextInput
-                    type="text"
-                    inputMode="numeric"
+                  <DateInput
                     value={setup.start_date}
                     onChange={(e) => updateSetup("start_date", e.target.value)}
-                    placeholder="18/07/2026"
                   />
                 </FieldShell>
                 <FieldShell label="End date">
-                  <TextInput
-                    type="text"
-                    inputMode="numeric"
+                  <DateInput
                     value={setup.end_date}
                     onChange={(e) => updateSetup("end_date", e.target.value)}
-                    placeholder="21/07/2026"
                   />
                 </FieldShell>
                 <FieldShell label="Territory summary">
@@ -2993,7 +3140,7 @@ export function NewBriefForm({
                             clearImport();
                             setAdSets((current) => [
                               ...current,
-                              duplicateAdSet(adSet),
+                              duplicateAdSet(adSet, duplicateLabel(current, adSet.label, adSetTerms.singular)),
                             ]);
                           }}
                           className="mini-button"
@@ -3209,7 +3356,7 @@ export function NewBriefForm({
                     clearImport();
                     setAds((current) => [
                       ...current,
-                      newAd(`Ad ${current.length + 1}`, adSetIds),
+                      newAd(nextSequentialLabel(current, "Ad"), adSetIds),
                     ]);
                   }}
                   className="pixel-button text-xs"
@@ -3253,7 +3400,7 @@ export function NewBriefForm({
                             clearImport();
                             setAds((current) => [
                               ...current,
-                              duplicateAd(ad),
+                              duplicateAd(ad, duplicateLabel(current, ad.label, "Ad")),
                             ]);
                           }}
                           className="mini-button"

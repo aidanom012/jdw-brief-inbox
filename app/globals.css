@@ -4298,6 +4298,61 @@ input.field {
   background: linear-gradient(90deg, var(--console-red), var(--console-amber), var(--console-green));
   transition: width .28s ease;
 }
+.launch-blocker-card {
+  border-color: rgba(244,63,94,.22);
+  background: linear-gradient(180deg, #fff, #fff8f9);
+}
+.launch-blocker-card h4 {
+  margin-top: .72rem;
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.08;
+}
+.launch-blocker-card p {
+  margin-top: .7rem;
+  color: rgba(17,19,24,.66);
+  font-size: .82rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+.launch-blocker-card-ready {
+  border-color: rgba(34,197,94,.24);
+  background: linear-gradient(180deg, #fff, #f3fff7);
+}
+.launch-blocker-list {
+  display: grid;
+  gap: .45rem;
+  margin-top: .72rem;
+}
+.launch-blocker-list button {
+  display: grid;
+  gap: .16rem;
+  width: 100%;
+  border: 1px solid rgba(17,19,24,.1);
+  border-radius: 9px;
+  background: rgba(255,255,255,.86);
+  color: var(--console-ink);
+  padding: .62rem .68rem;
+  text-align: left;
+}
+.launch-blocker-list button:hover {
+  border-color: rgba(244,63,94,.4);
+  transform: translateY(-1px);
+}
+.launch-blocker-list strong {
+  font-size: .82rem;
+  font-weight: 950;
+}
+.launch-blocker-list small {
+  color: rgba(17,19,24,.62);
+  font-size: .7rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+.date-field {
+  cursor: pointer;
+}
+
 .template-button-grid {
   display: grid;
   gap: .48rem;

@@ -85,7 +85,6 @@ type CompactBrief = {
   platform: string | null;
   account: string | null;
   acid: string | null;
-  asid: string | null;
   objective: string | null;
   campaign_type: string | null;
   conversion_location: string | null;
@@ -136,11 +135,11 @@ export class AiBriefError extends Error {
 const AI_BRIEF_SYSTEM_PROMPT = `You extract paid-social campaign brief details from messy JDW / James Walker notes.
 Return exactly one valid JSON object only. The first character must be { and the last character must be }. No markdown. No prose. No comments.
 Never output brief_version, source, build, missing_required_fields, or the full JDW app schema.
-Return only this compact object shape: {"briefs":[{"artist":"","release_title":"","platform":"","account":"","acid":"","asid":"","objective":"","campaign_type":"","conversion_location":"","optimisation_event":"","pixel":"","budget_type":"","budget_amount":"","currency":"","start_date":"","end_date":"","territory_summary":"","campaign_notes":"","ad_sets":[{"label":"","locations":[],"age_min":"","age_max":"","gender":"","placements":[],"budget_amount":"","budget_type":"","targeting_type":"","targeting_details":"","exclusions":"","notes":"","ads":[{"label":"","release_title":"","asset_type":"","asset_links":[],"post_url":"","boost_code":"","destination_url":"","copy":"","notes":""}]}],"ads":[],"special_notes":[]}]}
+Return only this compact object shape: {"briefs":[{"artist":"","release_title":"","platform":"","account":"","acid":"","objective":"","campaign_type":"","conversion_location":"","optimisation_event":"","pixel":"","budget_type":"","budget_amount":"","currency":"","start_date":"","end_date":"","territory_summary":"","campaign_notes":"","ad_sets":[{"label":"","locations":[],"age_min":"","age_max":"","gender":"","placements":[],"budget_amount":"","budget_type":"","targeting_type":"","targeting_details":"","exclusions":"","notes":"","ads":[{"label":"","release_title":"","asset_type":"","asset_links":[],"post_url":"","boost_code":"","destination_url":"","copy":"","notes":""}]}],"ads":[],"special_notes":[]}]}
 Use empty strings for unknown scalar values and empty arrays for unknown lists. Keep output compact.
-Preserve exact supplied links, boost codes, ACID, ASID, budgets, dates, platforms, accounts, pixels, optimisation events, targeting, copy, and notes.
+Preserve exact supplied links, boost codes, ACID, budgets, dates, platforms, accounts, pixels, optimisation events, targeting, copy, and notes.
 If there are multiple distinct campaign setups, return one item per setup in briefs[].
-Split campaign setups when the note has explicit campaign headings, separate artists/releases, separate platforms, separate objectives, separate accounts, separate ACID/ASID values, separate territories, separate budgets, or separate flights.
+Split campaign setups when the note has explicit campaign headings, separate artists/releases, separate platforms, separate objectives, separate accounts, separate ACID values, separate territories, separate budgets, or separate flights.
 Do not merge a Meta setup and a TikTok setup. Do not merge separate budget/objective setups for the same artist. If values are shared across setups, copy those exact values into each relevant brief.
 Keep multiple ad sets/ad groups or multiple ads inside one campaign brief when they clearly belong to the same campaign setup.`;
 
@@ -212,7 +211,6 @@ const compactBriefSchema = objectSchema({
   platform: nullableString("Meta, TikTok, YouTube, Other, or null."),
   account: nullableString(),
   acid: nullableString(),
-  asid: nullableString(),
   objective: nullableString(),
   campaign_type: nullableString(),
   conversion_location: nullableString(),
@@ -398,7 +396,6 @@ function campaignSplitHints(rawBrief: string) {
     ),
   );
   const acidMentions = uniqueRegexMatches(rawBrief, /\bACID\s*[:#-]?\s*([A-Z0-9_-]{3,})/gi, 12);
-  const asidMentions = uniqueRegexMatches(rawBrief, /\bASID\s*[:#-]?\s*([A-Z0-9_-]{3,})/gi, 12);
   const objectiveMentions = uniqueRegexMatches(
     rawBrief,
     /\b(streaming conversions?|sales|traffic|landing page views?|lpv|video views?|thruplay|awareness|engagement|followers|leads?|conversions?|spark|boost)\b/gi,
@@ -426,10 +423,6 @@ function campaignSplitHints(rawBrief: string) {
     expectedCampaignSetups = Math.max(expectedCampaignSetups, acidMentions.length);
     splitSignals.push(`${acidMentions.length} ACID values`);
   }
-  if (asidMentions.length > 1) {
-    expectedCampaignSetups = Math.max(expectedCampaignSetups, asidMentions.length);
-    splitSignals.push(`${asidMentions.length} ASID values`);
-  }
   if (objectiveMentions.length > 1 && budgetMentions.length > 1) {
     expectedCampaignSetups = Math.max(expectedCampaignSetups, Math.min(objectiveMentions.length, budgetMentions.length));
     splitSignals.push("multiple objective and budget pairs");
@@ -442,7 +435,6 @@ function campaignSplitHints(rawBrief: string) {
     numberedCampaignLines: numberedCampaignLines.slice(0, 10),
     platforms: platformMentions,
     acidMentions,
-    asidMentions,
     objectiveMentions,
     budgetMentions
   };
@@ -452,11 +444,9 @@ function localFacts(rawBrief: string) {
   const urls = Array.from(new Set(rawBrief.match(/https?:\/\/[^\s)\]>"']+/gi) || []));
   const boostCodes = Array.from(new Set(rawBrief.match(/#[A-Za-z0-9+/=_-]{20,}/g) || []));
   const acid = getFirstRegex(rawBrief, /\bACID\s*[:#-]?\s*([A-Z0-9_-]{3,})/i);
-  const asid = getFirstRegex(rawBrief, /\bASID\s*[:#-]?\s*([A-Z0-9_-]{3,})/i);
   const budgetMatch = rawBrief.match(/[£€$]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:gbp|eur|usd|aud|cad)\b/i)?.[0] || null;
   return {
     acid,
-    asid,
     urls: urls.slice(0, 30),
     boostCodes: boostCodes.slice(0, 20),
     budgetHint: budgetMatch,
@@ -528,7 +518,6 @@ function compactBriefToJdw(value: unknown, rawBrief: string): JDWCampaignBrief {
       artist: stringOrNull(brief.artist),
       release_title: stringOrNull(brief.release_title),
       acid: stringOrNull(brief.acid) ?? facts.acid,
-      asid: stringOrNull(brief.asid) ?? facts.asid,
       platform: platformValue(brief.platform),
       account: stringOrNull(brief.account),
       objective: stringOrNull(brief.objective),

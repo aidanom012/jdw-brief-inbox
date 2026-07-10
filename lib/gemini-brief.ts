@@ -53,7 +53,7 @@ const GEMINI_BRIEF_PROMPT = `You convert messy JDW / James Walker paid social ca
 
 Return JSON only. Do not include markdown, comments, or explanations.
 Do not guess missing fields. If a field is not clearly present, use null, "unknown", or [] as appropriate.
-Preserve exact details from the brief, including budgets, dates, links, ACID, ASID, pixel, optimisation event, account, platform, territory, targeting, ad copy, post URLs, boost codes, and asset links.
+Preserve exact details from the brief, including budgets, dates, links, ACID, pixel, optimisation event, account, platform, territory, targeting, ad copy, post URLs, boost codes, and asset links.
 Do not invent targeting, dates, budgets, pixels, campaign names, copy, or links.
 
 If the pasted text contains one campaign, return one JDW_CAMPAIGN_BRIEF_V1 object.
@@ -80,7 +80,6 @@ Use this exact object shape for a single campaign:
     "artist": null,
     "release_title": null,
     "acid": null,
-    "asid": null,
     "platform": null,
     "account": null,
     "objective": null,
@@ -266,7 +265,6 @@ const singleBriefJsonSchema = objectSchema({
     artist: nullableString(),
     release_title: nullableString(),
     acid: nullableString(),
-    asid: nullableString(),
     platform: nullableEnum(["Meta", "TikTok", "YouTube", "Other"]),
     account: nullableString(),
     objective: nullableString(),
