@@ -87,6 +87,8 @@ type NewBriefFormProps = {
   savedProjects?: string[];
 };
 
+type BuildMode = "choice" | "manual" | "ai";
+
 const PLATFORM_OPTIONS = ["Meta", "TikTok", "YouTube", "Other"] as const;
 const CURRENCY_OPTIONS = [
   "GBP",
@@ -177,6 +179,133 @@ const SLIDES = [
   { label: "Ads", hint: "Assets + copy" },
   { label: "Review", hint: "Save draft" },
 ] as const;
+
+type PlaybookGuide = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  bullets: string[];
+};
+
+function isTikTokPlatform(platform: Platform): boolean {
+  return platform === "TikTok";
+}
+
+function isMetaPlatform(platform: Platform): boolean {
+  return platform === "Meta";
+}
+
+function adSetUnit(platform: Platform): { singular: string; plural: string; lower: string; lowerPlural: string } {
+  return isTikTokPlatform(platform)
+    ? { singular: "Ad group", plural: "Ad groups", lower: "ad group", lowerPlural: "ad groups" }
+    : { singular: "Ad set", plural: "Ad sets", lower: "ad set", lowerPlural: "ad sets" };
+}
+
+function slideLabelForPlatform(slide: number, platform: Platform): string {
+  if (slide === 8) return adSetUnit(platform).plural;
+  if (slide === 9) return `${adSetUnit(platform).singular} details`;
+  return SLIDES[slide].label;
+}
+
+function slideHintForPlatform(slide: number, platform: Platform): string {
+  if (slide === 8) return isTikTokPlatform(platform) ? "How many TikTok ad groups?" : "How many Meta ad sets?";
+  if (slide === 9) return isTikTokPlatform(platform) ? "Placement, targeting, budget, and optimisation." : "Audience, placements, budget, and targeting.";
+  if (slide === 5 && isTikTokPlatform(platform)) return "Pixel/event if needed, or skip for Spark/video views.";
+  if (slide === 5 && isMetaPlatform(platform)) return "Pixel/dataset, conversion location, and optimisation event.";
+  return SLIDES[slide].hint;
+}
+
+function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null {
+  if (!platform) return null;
+
+  if (isMetaPlatform(platform)) {
+    if (slide === 2) {
+      return {
+        eyebrow: "Meta playbook",
+        title: "Meta builds use Campaign → Ad Set → Ad.",
+        body: "The Meta walkthrough separates campaign-level decisions, ad-set decisions, and ad-level decisions.",
+        bullets: ["Campaign: account, objective, budget", "Ad set: flight time, audience, placements", "Ad: format, Page/IG, creative and copy"],
+      };
+    }
+    if (slide === 4) {
+      return {
+        eyebrow: "Campaign level",
+        title: "Match the objective to what James actually wants.",
+        body: "Meta’s objective choice controls delivery. Use traffic/video views/engagement/sales/conversions according to the actual goal.",
+        bullets: ["Streaming click campaign = Website / conversion-style setup", "Views campaign = Video Views or ThruPlay", "Sales/store work = conversion objective and pixel/dataset"],
+      };
+    }
+    if (slide === 5) {
+      return {
+        eyebrow: "Tracking check",
+        title: "Pixel/dataset only matters when the objective needs it.",
+        body: "Conversion-style Meta campaigns need the right pixel/dataset and optimisation event. Awareness or video-view builds may not.",
+        bullets: ["Confirm conversion location", "Confirm optimisation event", "Confirm pixel/dataset name"],
+      };
+    }
+    if (slide === 9) {
+      return {
+        eyebrow: "Ad set level",
+        title: "This is where audience and placements live.",
+        body: "Use this step for locations, age, gender, interest/retargeting/LAL notes, exclusions, and placement decisions.",
+        bullets: ["Flight time / schedule", "Audience targeting", "Placements and exclusions"],
+      };
+    }
+    if (slide === 10) {
+      return {
+        eyebrow: "Ad level",
+        title: "This is where creative, page/IG, copy, and URL live.",
+        body: "Keep asset links, post URLs, copy, and destination URLs attached to the exact ad they belong to.",
+        bullets: ["Creative format", "Page / Instagram post", "Copy and destination URL"],
+      };
+    }
+  }
+
+  if (isTikTokPlatform(platform)) {
+    if (slide === 2) {
+      return {
+        eyebrow: "TikTok playbook",
+        title: "TikTok builds use Campaign → Ad Group → Ad.",
+        body: "The TikTok guide separates campaign, ad group, and ad setup. The site mirrors that but still saves to the JDW ad_set structure underneath.",
+        bullets: ["Campaign: objective and budget", "Ad group: placement, targeting, budget", "Ad: Spark code, asset, copy, URL"],
+      };
+    }
+    if (slide === 4) {
+      return {
+        eyebrow: "Campaign level",
+        title: "Pick the TikTok objective first.",
+        body: "For James briefs this is usually Video Views, Traffic, Website Conversions, Engagement, or Followers.",
+        bullets: ["Video Views: 15-sec engaged view / view optimisation", "Traffic/conversions: needs destination and event", "Spark/boost: needs post URL or boost code"],
+      };
+    }
+    if (slide === 5) {
+      return {
+        eyebrow: "Tracking/event check",
+        title: "Skip tracking for simple view/Spark boosts unless James specifies an event.",
+        body: "For website or conversion campaigns, capture pixel/event details here. For video views, move on if not supplied.",
+        bullets: ["Website conversions need pixel/event", "Spark/video views need post URL or boost code", "Do not invent missing tracking"],
+      };
+    }
+    if (slide === 9) {
+      return {
+        eyebrow: "Ad group level",
+        title: "This is the TikTok ad group setup.",
+        body: "Use this step for TikTok locations, age, targeting, placements, optimisation notes, and optional ad group budget.",
+        bullets: ["Audience and territory", "Placement and optimisation", "Budget split if not campaign-level"],
+      };
+    }
+    if (slide === 10) {
+      return {
+        eyebrow: "Ad level",
+        title: "Spark codes and post URLs belong here.",
+        body: "Attach every boost code, TikTok post URL, asset link, copy line, and destination URL to its exact ad.",
+        bullets: ["Spark/boost code", "TikTok post URL", "Asset/copy/destination"],
+      };
+    }
+  }
+
+  return null;
+}
 
 function uid(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -695,61 +824,19 @@ function SummaryStrip({
   adSets: WizardAdSet[];
   ads: WizardAd[];
 }) {
+  const terms = adSetUnit(setup.platform);
   return (
     <div className="quick-summary">
       <span>{setup.artist || "artist?"}</span>
       <span>{setup.release_title || "project?"}</span>
       <span>{setup.platform || "platform?"}</span>
       <span>
-        {adSets.length} ad set{adSets.length === 1 ? "" : "s"}
+        {adSets.length} {adSets.length === 1 ? terms.lower : terms.lowerPlural}
       </span>
       <span>
         {ads.length} ad{ads.length === 1 ? "" : "s"}
       </span>
     </div>
-  );
-}
-
-const BUILD_MANUAL_ITEMS = [
-  {
-    step: "Import",
-    title: "Paste James talk",
-    body: "Drop the raw message, email, brief, links, or notes into Groq."
-  },
-  {
-    step: "Check",
-    title: "Answer missing bits",
-    body: "Use the review prompts to ask James for anything he forgot."
-  },
-  {
-    step: "Build",
-    title: "Edit manually",
-    body: "Adjust campaign setup, ad sets, ads, copy, URLs, and budgets before saving."
-  },
-  {
-    step: "Save",
-    title: "Create draft",
-    body: "Save only after the structured brief looks right."
-  }
-] as const;
-
-function BuildManual() {
-  return (
-    <aside className="build-manual pixel-window p-4 sm:p-5">
-      <p className="pixel-label">Build manual</p>
-      <h2 className="mt-1 text-2xl font-black tracking-tight">Clear path from chat to campaign.</h2>
-      <div className="mt-4 grid gap-3">
-        {BUILD_MANUAL_ITEMS.map((item, index) => (
-          <div key={item.step} className="manual-step">
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <strong>{item.title}</strong>
-              <p>{item.body}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </aside>
   );
 }
 
@@ -845,6 +932,7 @@ function ActiveInfoPanel({
   const selectedAdSet =
     adSets[Math.max(0, Math.min(adSets.length - 1, slide - 9))];
   const selectedAd = ads[0];
+  const terms = adSetUnit(setup.platform);
   const rows =
     slide <= 7
       ? [
@@ -867,7 +955,7 @@ function ActiveInfoPanel({
         ]
       : slide === 8 || slide === 9
         ? [
-            ["Ad sets", adSets.length],
+            [terms.plural, adSets.length],
             ["Current", selectedAdSet?.label],
             ["Notes", selectedAdSet?.notes],
             [
@@ -888,7 +976,7 @@ function ActiveInfoPanel({
               ["Artist", setup.artist],
               ["Project", setup.release_title],
               ["Platform", setup.platform],
-              ["Ad sets", adSets.length],
+              [terms.plural, adSets.length],
               ["Ads", ads.length],
             ];
 
@@ -921,6 +1009,162 @@ function ActiveInfoPanel({
   );
 }
 
+function PlaybookGuideCard({ guide }: { guide: PlaybookGuide }) {
+  return (
+    <aside className="playbook-guide">
+      <div>
+        <p className="pixel-label">{guide.eyebrow}</p>
+        <h4>{guide.title}</h4>
+        <p>{guide.body}</p>
+      </div>
+      <ul>
+        {guide.bullets.map((bullet) => (
+          <li key={bullet}>{bullet}</li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+function WizardControls({
+  slide,
+  onBack,
+  onSkip,
+  onNext,
+  onSubmit,
+  isPending,
+  briefId,
+  importedJson,
+}: {
+  slide: number;
+  onBack: () => void;
+  onSkip: () => void;
+  onNext: () => void;
+  onSubmit: () => void;
+  isPending: boolean;
+  briefId?: string;
+  importedJson: string | null;
+}) {
+  return (
+    <div className="wizard-controls wizard-controls-inline">
+      <button
+        type="button"
+        onClick={onBack}
+        disabled={slide === 0}
+        className="mini-button px-4 py-3 disabled:opacity-40"
+      >
+        Back
+      </button>
+      <button
+        type="button"
+        onClick={onSkip}
+        disabled={slide === SLIDES.length - 1}
+        className="mini-button px-4 py-3 disabled:opacity-40"
+      >
+        Skip
+      </button>
+      {slide < SLIDES.length - 1 ? (
+        <button
+          type="button"
+          onClick={onNext}
+          className="pixel-button px-6 py-4 text-sm"
+        >
+          Next
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={isPending}
+          className="pixel-button px-6 py-4 text-sm disabled:opacity-60"
+        >
+          {isPending
+            ? "Saving..."
+            : briefId
+              ? "Update brief"
+              : importedJson
+                ? "Submit imported JSON"
+                : "Save draft"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BuilderModeBanner({
+  mode,
+  onBackToStart,
+}: {
+  mode: BuildMode;
+  onBackToStart: () => void;
+}) {
+  if (mode === "choice") return null;
+  return (
+    <section className="builder-mode-banner">
+      <div>
+        <p className="pixel-label">{mode === "ai" ? "AI imported draft" : "Manual build"}</p>
+        <h1>{mode === "ai" ? "Review every setting like a manual build." : "Manual campaign walkthrough."}</h1>
+        <p>
+          {mode === "ai"
+            ? "Groq has only pre-filled the draft. Use Back/Next to check every campaign, tracking, audience, ad, and review setting before saving."
+            : "Start empty and move through the same Meta/TikTok setup order used by Ads Manager."}
+        </p>
+      </div>
+      <button type="button" className="mini-button" onClick={onBackToStart}>
+        Change path
+      </button>
+    </section>
+  );
+}
+
+function EntryChoiceScreen({
+  onManual,
+  onGenerated,
+}: {
+  onManual: () => void;
+  onGenerated: (
+    json: string,
+    validation: Extract<BriefValidationResult, { ok: true }>,
+    message: string,
+  ) => void;
+}) {
+  return (
+    <div className="entry-choice-screen">
+      <section className="entry-heading">
+        <p className="pixel-label">JDW build studio</p>
+        <h1>Choose how to start.</h1>
+        <p>
+          Manual and AI are now separate. Both routes load into the same step-by-step Meta/TikTok walkthrough.
+        </p>
+      </section>
+
+      <section className="entry-grid">
+        <article className="entry-card entry-card-manual">
+          <p className="pixel-label">Manual build</p>
+          <h2>Start from blank fields.</h2>
+          <p>
+            Use this when you already know the settings or want to build without AI. It walks through campaign, tracking, audiences, ads, missing info, and review.
+          </p>
+          <button type="button" className="pixel-button mt-5" onClick={onManual}>
+            Start manual build
+          </button>
+        </article>
+
+        <article className="entry-card entry-card-ai">
+          <p className="pixel-label">AI import</p>
+          <h2>Paste James notes first.</h2>
+          <p>
+            Groq pre-fills a draft only. After import, you still go through the exact same walkthrough and confirm every setting before saving.
+          </p>
+          <div className="mt-5">
+            <AiBriefPanel onGenerated={onGenerated} />
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
 export function NewBriefForm({
   initialBrief,
   briefId,
@@ -933,6 +1177,7 @@ export function NewBriefForm({
     [initialBrief],
   );
   const [slide, setSlide] = useState(0);
+  const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief ? "manual" : "choice");
   const [infoOpen, setInfoOpen] = useState(false);
   const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
   const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
@@ -971,6 +1216,10 @@ export function NewBriefForm({
   const activeJson =
     importedValidation?.ok && importedJson ? importedJson : manualJson;
   const currentSlide = SLIDES[slide];
+  const currentSlideLabel = slideLabelForPlatform(slide, setup.platform);
+  const currentSlideHint = slideHintForPlatform(slide, setup.platform);
+  const currentPlaybookGuide = playbookGuide(slide, setup.platform);
+  const adSetTerms = adSetUnit(setup.platform);
 
   useEffect(() => {
     if (briefId || initialBrief) {
@@ -1046,13 +1295,15 @@ export function NewBriefForm({
       setAds(nextState.ads);
       setImportedJson(null);
       setImportedValidation(null);
-      setSlide(11);
-      setAutosaveMessage(message);
+      setBuildMode("ai");
+      setSlide(0);
+      setAutosaveMessage(`${message}; review from step 1`);
       return;
     }
 
     setImportedJson(json);
     setImportedValidation(validation);
+    setBuildMode("ai");
     setSlide(11);
     setAutosaveMessage(message);
   }
@@ -1127,8 +1378,33 @@ export function NewBriefForm({
     });
   }
 
+  function startManualBuild() {
+    clearImport();
+    setBuildMode("manual");
+    setSlide(0);
+    setSubmitError(null);
+  }
+
+  function backToStartChoice() {
+    setBuildMode("choice");
+    setInfoOpen(false);
+    setSubmitError(null);
+  }
+
+  if (buildMode === "choice" && !briefId && !initialBrief) {
+    return (
+      <EntryChoiceScreen
+        onManual={startManualBuild}
+        onGenerated={(json, validation, message) =>
+          applyValidatedJson(json, validation, message)
+        }
+      />
+    );
+  }
+
   return (
     <div className="one-by-one-builder">
+      <BuilderModeBanner mode={buildMode} onBackToStart={backToStartChoice} />
       <div className="pixel-window p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -1136,10 +1412,10 @@ export function NewBriefForm({
               Step {slide + 1} of {SLIDES.length}
             </p>
             <h2 className="mt-1 text-3xl font-black tracking-tight">
-              {currentSlide.label}
+              {currentSlideLabel}
             </h2>
             <p className="mt-1 text-sm font-semibold pixel-muted">
-              {currentSlide.hint}
+              {currentSlideHint}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1172,16 +1448,27 @@ export function NewBriefForm({
               type="button"
               onClick={() => setSlide(index)}
               className={`step-dot ${index === slide ? "step-dot-active" : ""}`}
-              aria-label={`Go to ${item.label}`}
+              aria-label={`Go to ${slideLabelForPlatform(index, setup.platform)}`}
             />
           ))}
         </div>
+        <WizardControls
+          slide={slide}
+          onBack={previousSlide}
+          onSkip={nextSlide}
+          onNext={nextSlide}
+          onSubmit={submitBrief}
+          isPending={isPending}
+          briefId={briefId}
+          importedJson={importedJson}
+        />
       </div>
 
       <div
         className={`builder-workspace ${infoOpen ? "builder-workspace-open" : ""}`}
       >
         <div key={slide} className="swipe-card pixel-window p-5 sm:p-8">
+          {currentPlaybookGuide ? <PlaybookGuideCard guide={currentPlaybookGuide} /> : null}
           {slide === 0 ? (
             <section className="simple-question">
               <p className="pixel-label">Artist folder</p>
@@ -1448,8 +1735,8 @@ export function NewBriefForm({
 
           {slide === 8 ? (
             <section className="simple-question">
-              <p className="pixel-label">Ad sets</p>
-              <h3>How many ad sets?</h3>
+              <p className="pixel-label">{adSetTerms.plural}</p>
+              <h3>How many {adSetTerms.lowerPlural}?</h3>
               <TextInput
                 type="number"
                 min={1}
@@ -1461,7 +1748,7 @@ export function NewBriefForm({
                 className="mega-field mx-auto max-w-60 text-center"
               />
               <p className="helper-copy">
-                Example: 1 broad ad set, 5 city ad sets, or 2 test cells.
+                Example: 1 broad {adSetTerms.lower}, 5 city {adSetTerms.lowerPlural}, or 2 test cells.
               </p>
             </section>
           ) : null}
@@ -1469,9 +1756,9 @@ export function NewBriefForm({
           {slide === 9 ? (
             <section className="grid gap-5">
               <div className="text-center">
-                <p className="pixel-label">Ad set details</p>
+                <p className="pixel-label">{adSetTerms.singular} details</p>
                 <h3 className="text-3xl font-black">
-                  What does each ad set do?
+                  What does each {adSetTerms.lower} do?
                 </h3>
                 <p className="helper-copy">
                   Keep it simple: name, targeting notes, optional budget.
@@ -1481,7 +1768,7 @@ export function NewBriefForm({
               <div className="pixel-card p-4">
                 <div className="grid gap-4 lg:grid-cols-3">
                   <div className="lg:col-span-2">
-                    <FieldShell label="Same note for every ad set">
+                    <FieldShell label={`Same note for every ${adSetTerms.lower}`}>
                       <TextArea
                         value={sameAdSetNotes}
                         onChange={(e) => setSameAdSetNotes(e.target.value)}
@@ -1498,7 +1785,7 @@ export function NewBriefForm({
                         className="h-5 w-5"
                       />
                       <span className="text-sm font-black">
-                        Same ad set budget?
+                        Same {adSetTerms.lower} budget?
                       </span>
                     </label>
                     {sameBudgetEnabled ? (
@@ -1542,7 +1829,7 @@ export function NewBriefForm({
                         );
                       }}
                     >
-                      Apply to all ad sets
+                      Apply to all {adSetTerms.lowerPlural}
                     </button>
                   </div>
                 </div>
@@ -1553,9 +1840,9 @@ export function NewBriefForm({
                   <article key={adSet.id} className="pixel-card p-4 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="pixel-label">Ad set {adSetIndex + 1}</p>
+                        <p className="pixel-label">{adSetTerms.singular} {adSetIndex + 1}</p>
                         <h4 className="mt-1 text-2xl font-black">
-                          {adSet.label || `Ad set ${adSetIndex + 1}`}
+                          {adSet.label || `${adSetTerms.singular} ${adSetIndex + 1}`}
                         </h4>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1592,7 +1879,7 @@ export function NewBriefForm({
                     </div>
 
                     <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                      <FieldShell label="Ad set name">
+                      <FieldShell label={`${adSetTerms.singular} name`}>
                         <TextInput
                           value={adSet.label}
                           onChange={(e) =>
@@ -1602,7 +1889,7 @@ export function NewBriefForm({
                         />
                       </FieldShell>
                       <div className="lg:col-span-2">
-                        <FieldShell label="What does this ad set do / target?">
+                        <FieldShell label={`What does this ${adSetTerms.lower} do / target?`}>
                           <TextArea
                             value={adSet.notes}
                             onChange={(e) =>
@@ -1716,7 +2003,7 @@ export function NewBriefForm({
                         />
                         <span>
                           <span className="block font-black">
-                            Ad set budget?
+                            {adSetTerms.singular} budget?
                           </span>
                           <span className="text-sm font-semibold pixel-muted">
                             Only if split here.
@@ -1769,10 +2056,10 @@ export function NewBriefForm({
                 <div>
                   <p className="pixel-label">Ads</p>
                   <h3 className="text-3xl font-black">
-                    Create ads once. Send them to any ad set.
+                    Create ads once. Send them to any {adSetTerms.lower}.
                   </h3>
                   <p className="helper-copy text-left">
-                    Tick 3 of 5 ad sets, all of them, or only one.
+                    Tick 3 of 5 {adSetTerms.lowerPlural}, all of them, or only one.
                   </p>
                 </div>
                 <button
@@ -1959,10 +2246,10 @@ export function NewBriefForm({
                               className="sr-only"
                             />
                             <span className="pixel-label block">
-                              Ad set {index + 1}
+                              {adSetTerms.singular} {index + 1}
                             </span>
                             <span className="mt-1 block font-black">
-                              {adSet.label || `Ad set ${index + 1}`}
+                              {adSet.label || `${adSetTerms.singular} ${index + 1}`}
                             </span>
                           </label>
                         ))}
@@ -2045,57 +2332,6 @@ export function NewBriefForm({
           />
         ) : null}
       </div>
-
-      <div className="wizard-controls pixel-window p-4">
-        <button
-          type="button"
-          onClick={previousSlide}
-          disabled={slide === 0}
-          className="mini-button px-4 py-3 disabled:opacity-40"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={nextSlide}
-          disabled={slide === SLIDES.length - 1}
-          className="mini-button px-4 py-3 disabled:opacity-40"
-        >
-          Skip
-        </button>
-        {slide < SLIDES.length - 1 ? (
-          <button
-            type="button"
-            onClick={nextSlide}
-            className="pixel-button px-6 py-4 text-sm"
-          >
-            Next
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={submitBrief}
-            disabled={isPending}
-            className="pixel-button px-6 py-4 text-sm disabled:opacity-60"
-          >
-            {isPending
-              ? "Saving..."
-              : briefId
-                ? "Update brief"
-                : importedJson
-                  ? "Submit imported JSON"
-                  : "Save draft"}
-          </button>
-        )}
-      </div>
-
-      {!briefId ? (
-        <AiBriefPanel
-          onGenerated={(json, validation, message) =>
-            applyValidatedJson(json, validation, message)
-          }
-        />
-      ) : null}
     </div>
   );
 }

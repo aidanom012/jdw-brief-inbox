@@ -1,3 +1,7 @@
+# JDW Brief Builder - Manual/AI Platform Wizard
+
+Latest rebuild: `/new` now starts with two clear paths: **Manual Build** and **AI Import**. Both routes enter the same platform-aware walkthrough for Meta/TikTok campaign setup. AI import only pre-fills a draft; the user still steps through every setting before saving.
+
 # JDW Brief Inbox
 
 Private Next.js app for turning messy JDW / James Walker campaign notes into structured campaign briefs, ad sets, ads, validation state, and build checklists.

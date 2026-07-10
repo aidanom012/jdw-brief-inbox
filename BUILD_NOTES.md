@@ -1,55 +1,43 @@
-# Groq JSON object rebuild
+# Build Notes - Platform-aware manual/AI wizard rebuild
 
-This build replaces the Gemini parser path with a Groq-first AI parser.
+## What changed
 
-## Main changes
+- Rebuilt `/new` so the user chooses either **Manual Build** or **AI Import** first.
+- Removed the old top explainer / “Clear path from chat to campaign” manual card.
+- AI Import is now its own clear starting section, not mixed into the manual wizard.
+- Manual Build and AI Import both feed into the same step-by-step campaign walkthrough.
+- After Groq import, the builder now starts from step 1 so the user reviews every setting like a manual build instead of being dropped straight into final review.
+- Back / Skip / Next / Save controls are now inside the wizard header section, above the step body, not underneath the AI box.
+- Added platform-aware guidance based on the uploaded Meta and TikTok walkthroughs:
+  - Meta: Campaign → Ad Set → Ad
+  - TikTok: Campaign → Ad Group → Ad
+- TikTok mode now labels ad set screens as **Ad groups** in the walkthrough UI while still saving to the existing JDW schema internally.
+- Added stronger high-contrast CSS overrides for inputs, textareas, selected cards, missing-info prompts, AI panel, and wizard sections.
 
-- Added `lib/ai-brief.ts`.
-- Added `/api/ai/brief`.
-- Kept `/api/gemini/brief` as a compatibility wrapper to `/api/ai/brief`.
-- Frontend now posts to `/api/ai/brief`.
-- UI wording now says Groq/AI instead of Gemini.
-- Manual builder remains primary and the AI helper stays below the manual input section.
+## AI behaviour
 
-## Provider/config
+- Groq remains the primary parser through `/api/ai/brief`.
+- `GROQ_RESPONSE_FORMAT` is still ignored by the backend; the code forces safer JSON-object mode.
+- AI output is only used as a draft prefill.
+- Nothing auto-saves after AI import.
+- Multiple brief selection still exists inside the AI panel.
 
-Use these environment variables:
+## Required Vercel env vars
 
 ```env
 AI_PROVIDER=groq
-GROQ_API_KEY=your_key_here
+GROQ_API_KEY=your_groq_key_here
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 
-Do not use `NEXT_PUBLIC_GROQ_API_KEY`.
+Do not add `GROQ_RESPONSE_FORMAT=json_schema`.
 
-## Backend behaviour
+## Checks run
 
-- One AI call per click.
-- No AI repair calls.
-- Uses Groq's OpenAI-compatible Chat Completions endpoint.
-- Uses Groq JSON mode with `response_format.type = "json_object"`.
-- Asks Groq for a compact extraction object only.
-- Backend expands compact output into `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` locally.
-- Multiple briefs are still supported in one request.
-- Local regex extraction pre-detects ACID, ASID, URLs, boost codes, and budget hints before the model call.
+```bash
+npm run typecheck
+npm run build
+```
 
-## Testing
-
-- `npm run typecheck` passed.
-- `npm run build` compiled and generated pages successfully.
-
-
-## Emergency JSON mode fix
-
-A Groq 400 `Failed to validate JSON` / `failed_generation` error means strict schema validation failed at Groq before the app received usable content. This build defaults to `` to avoid that failure path. The model now returns compact valid JSON and TypeScript expands/validates it locally.
-
-
-## 2026-07-10 Emergency cleanup
-
-- Removed the large /new top explainer/manual section.
-- Moved Back / Skip / Next controls above the AI helper so they belong to the manual builder flow.
-- Forced Groq JSON-object mode in code; old `GROQ_RESPONSE_FORMAT=json_schema` values are ignored.
-- Added final contrast overrides for funnel cards, dark selected cards, AI textarea, and form fields.
-- Kept Groq compact-output flow and no repair calls.
+Both passed.

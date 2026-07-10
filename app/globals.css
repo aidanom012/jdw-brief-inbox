@@ -3494,3 +3494,227 @@ input.field {
   color: #9f1d26 !important;
   border-color: rgba(159,29,38,.25) !important;
 }
+
+/* 2026-07-10 platform-aware builder rebuild.
+   Two start paths, one walkthrough, strong readable fields. */
+.entry-choice-screen {
+  display: grid;
+  gap: 1.25rem;
+}
+.entry-heading,
+.builder-mode-banner {
+  border: 1px solid rgba(16,18,22,.1);
+  border-radius: 28px;
+  background: #ffffff;
+  color: #101216;
+  padding: clamp(1.25rem, 4vw, 2.2rem);
+  box-shadow: var(--shadow-soft);
+}
+.entry-heading h1,
+.builder-mode-banner h1 {
+  margin-top: .35rem;
+  font-size: clamp(2.5rem, 7vw, 5.25rem);
+  line-height: .88;
+  font-weight: 950;
+  letter-spacing: -.055em;
+}
+.entry-heading p:not(.pixel-label),
+.builder-mode-banner p:not(.pixel-label) {
+  margin-top: .85rem;
+  max-width: 840px;
+  color: rgba(16,18,22,.68);
+  font-weight: 780;
+  line-height: 1.55;
+}
+.builder-mode-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.builder-mode-banner h1 { font-size: clamp(2rem, 5vw, 3.8rem); }
+.entry-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.entry-card {
+  border: 1px solid rgba(16,18,22,.12);
+  border-radius: 28px;
+  background: #ffffff;
+  color: #101216;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  box-shadow: var(--shadow-soft);
+}
+.entry-card h2 {
+  margin-top: .4rem;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: .95;
+  font-weight: 950;
+  letter-spacing: -.04em;
+}
+.entry-card p:not(.pixel-label) {
+  margin-top: .75rem;
+  color: rgba(16,18,22,.68);
+  font-weight: 750;
+  line-height: 1.55;
+}
+.entry-card-ai .gemini-import-panel {
+  box-shadow: none !important;
+  border-radius: 24px !important;
+  padding: 1rem !important;
+}
+.entry-card-ai .gemini-import-panel > div:first-child {
+  gap: .75rem !important;
+}
+.entry-card-ai .gemini-import-panel h2 {
+  font-size: clamp(1.6rem, 3vw, 2.25rem) !important;
+  letter-spacing: -.035em;
+}
+.entry-card-ai .gemini-import-panel .pixel-button {
+  width: 100%;
+}
+.playbook-guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(16,18,22,.12);
+  border-radius: 22px;
+  background: #f7f8fb;
+  color: #101216;
+  padding: 1rem;
+}
+.playbook-guide h4 {
+  margin-top: .25rem;
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -.03em;
+}
+.playbook-guide p {
+  margin-top: .55rem;
+  color: rgba(16,18,22,.68);
+  font-weight: 750;
+  line-height: 1.45;
+}
+.playbook-guide ul {
+  display: grid;
+  gap: .5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.playbook-guide li {
+  border: 1px solid rgba(16,18,22,.12);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: .7rem .8rem;
+  font-size: .85rem;
+  font-weight: 900;
+}
+.wizard-controls-inline {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: .75rem !important;
+  margin: 1rem 0 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.wizard-controls-inline .mini-button,
+.wizard-controls-inline .pixel-button {
+  min-width: 110px;
+}
+.one-by-one-builder > .gemini-import-panel {
+  display: none !important;
+}
+.simple-question {
+  min-height: 360px !important;
+}
+.swipe-card {
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+.missing-coach,
+.missing-question,
+.pixel-ready,
+.pixel-alert,
+.autosave-chip,
+.quick-summary,
+.mode-pill,
+.field,
+.import-textarea,
+select.field,
+textarea.field,
+input.field {
+  text-shadow: none !important;
+}
+.field,
+.import-textarea,
+select.field,
+textarea.field,
+input.field {
+  background: #ffffff !important;
+  color: #101216 !important;
+  border: 1px solid rgba(16,18,22,.32) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+.field:focus,
+.import-textarea:focus {
+  border-color: #101216 !important;
+  outline: 3px solid rgba(235,81,96,.28) !important;
+  transform: none !important;
+}
+.choice-card-active,
+.pixel-node-active,
+.flow-card-active {
+  background: #101216 !important;
+  color: #ffffff !important;
+  border-color: #101216 !important;
+}
+.choice-card-active .pixel-label,
+.pixel-node-active .pixel-label,
+.flow-card-active .pixel-label {
+  color: #ffffff !important;
+}
+.pixel-alert {
+  background: #fff1f0 !important;
+  color: #9f1d26 !important;
+  border: 1px solid rgba(235,81,96,.32) !important;
+}
+.pixel-ready {
+  background: #eefcf8 !important;
+  color: #096b60 !important;
+  border: 1px solid rgba(21,184,166,.28) !important;
+}
+
+@media (max-width: 980px) {
+  .entry-grid,
+  .playbook-guide,
+  .builder-mode-banner {
+    grid-template-columns: 1fr;
+  }
+  .builder-mode-banner {
+    display: grid;
+  }
+}
+
+@media (max-width: 640px) {
+  .entry-heading,
+  .entry-card,
+  .builder-mode-banner {
+    border-radius: 22px;
+  }
+  .wizard-controls-inline {
+    flex-wrap: wrap;
+  }
+  .wizard-controls-inline .pixel-button {
+    flex: 1 1 100%;
+  }
+}
