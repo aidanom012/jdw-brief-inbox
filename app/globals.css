@@ -1971,3 +1971,404 @@ body::before {
   .folder-shell .folder-card { width: 100% !important; }
   .folder-delete { opacity: 1 !important; }
 }
+
+/* 2026-07 STYLE RETHINK: SOFT FINDER DESKTOP
+   Goal: calmer, more premium, less harsh pixel-grid. Warm paper desktop on graphite background. */
+:root {
+  color-scheme: light !important;
+  --bg: #0b0d0f !important;
+  --ink: #121416 !important;
+  --paper: #fbfaf5 !important;
+  --paper-2: #f1ede3 !important;
+  --wash: #e6dfd2 !important;
+  --line: #121416 !important;
+  --accent: #d7c5a6 !important;
+  --accent-soft: #f0e6d4 !important;
+  --done: #121416 !important;
+  --done-soft: #f1ede3 !important;
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255,255,255,.08), transparent 32%),
+    linear-gradient(135deg, #080a0c 0%, #101418 52%, #080a0c 100%) !important;
+  color: #fbfaf5 !important;
+}
+
+body::before {
+  opacity: .18 !important;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.42) 1px, transparent 1.5px) !important;
+  background-size: 18px 18px !important;
+  mask-image: linear-gradient(to bottom, black, transparent 85%) !important;
+}
+
+.top-shell {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  padding-top: 1rem !important;
+}
+
+.brand-mark,
+.nav-chip {
+  border: 2px solid rgba(251,250,245,.85) !important;
+  background: rgba(251,250,245,.06) !important;
+  color: #fbfaf5 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,.18) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.brand-mark:hover,
+.nav-chip:hover {
+  background: #fbfaf5 !important;
+  color: #121416 !important;
+  border-color: #fbfaf5 !important;
+  transform: translateY(-2px) !important;
+}
+
+/* General cards/windows become soft, tactile paper instead of brutal high-contrast boxes. */
+.pixel-window,
+.pixel-card,
+.pixel-ad-card,
+.pixel-stat,
+.pixel-panel,
+.pixel-detail-panel,
+.folder-campaign-screen,
+.desktop-screen,
+.empty-desktop-panel {
+  border: 2px solid #121416 !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.2)),
+    radial-gradient(circle at 1px 1px, rgba(18,20,22,.05) 1px, transparent 1.35px),
+    #fbfaf5 !important;
+  background-size: auto, 16px 16px, auto !important;
+  color: #121416 !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,.24), 0 2px 0 rgba(255,255,255,.7) inset !important;
+}
+
+.pixel-window::before,
+.desktop-titlebar {
+  border-bottom: 2px solid #121416 !important;
+  background: #f1ede3 !important;
+  border-radius: 20px 20px 0 0 !important;
+}
+
+.desktop-screen,
+.folder-campaign-screen {
+  width: min(calc(100% - 2rem), 1640px) !important;
+  margin-inline: auto !important;
+  min-height: calc(100vh - 170px) !important;
+  padding: 0 clamp(1.4rem, 3.6vw, 4.5rem) clamp(3.5rem, 6vw, 6rem) !important;
+  overflow: visible !important;
+}
+
+.desktop-titlebar {
+  height: 44px !important;
+  margin: 0 calc(clamp(1.4rem, 3.6vw, 4.5rem) * -1) clamp(2.5rem, 4.5vw, 5rem) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding-left: 1.25rem !important;
+}
+
+.desktop-titlebar span {
+  width: 13px !important;
+  height: 13px !important;
+  margin-right: 9px !important;
+  border: 2px solid #121416 !important;
+  border-radius: 999px !important;
+  background: #fbfaf5 !important;
+}
+
+.desktop-header,
+.folder-campaign-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: clamp(2rem, 5vw, 6rem) !important;
+  margin-bottom: clamp(3rem, 6vw, 7rem) !important;
+}
+
+.desktop-header h1,
+.folder-campaign-header h1 {
+  max-width: 880px !important;
+  font-size: clamp(3rem, 5.6vw, 6.8rem) !important;
+  line-height: .9 !important;
+  letter-spacing: -.07em !important;
+}
+
+.desktop-header p:not(.pixel-label),
+.folder-campaign-header p:not(.pixel-label) {
+  max-width: 700px !important;
+  color: rgba(18,20,22,.72) !important;
+  font-size: clamp(1rem, 1.1vw, 1.15rem) !important;
+  line-height: 1.65 !important;
+}
+
+.pixel-button,
+.mini-button,
+.pixel-tab,
+.choice-card,
+.field,
+.nav-chip {
+  border-width: 2px !important;
+  border-radius: 12px !important;
+}
+
+.pixel-button,
+.mini-button.safe,
+.nav-chip-active,
+.pixel-tab-active,
+.pixel-node-active {
+  background: #121416 !important;
+  color: #fbfaf5 !important;
+  border-color: #121416 !important;
+}
+
+.pixel-button:hover,
+.mini-button:hover,
+.pixel-tab:hover,
+.choice-card:hover,
+.pixel-node:hover {
+  background: #d7c5a6 !important;
+  color: #121416 !important;
+  border-color: #121416 !important;
+  transform: translateY(-2px) !important;
+}
+
+.mini-button.danger,
+.folder-delete:hover {
+  background: #121416 !important;
+  color: #fbfaf5 !important;
+}
+
+/* Desktop folders: clean Finder-like icons, no clipping, no heavy cramped cards. */
+.desktop-icon-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 176px)) !important;
+  gap: clamp(4.25rem, 7vw, 7rem) clamp(3rem, 6vw, 6.5rem) !important;
+  align-items: start !important;
+  padding: 0 clamp(.5rem, 2vw, 2rem) 6rem !important;
+}
+
+.folder-shell,
+.folder-shell.desktop-folder {
+  position: relative !important;
+  width: 176px !important;
+  min-height: 238px !important;
+  animation: folder-in .26s cubic-bezier(.2,.85,.18,1) both !important;
+  animation-delay: var(--folder-delay, 0ms) !important;
+}
+
+.folder-card,
+.folder-shell .folder-card {
+  width: 176px !important;
+  min-height: 238px !important;
+  padding: 14px 10px 16px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  color: #121416 !important;
+  text-align: center !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.folder-card:hover,
+.folder-card:focus-visible {
+  background: rgba(215,197,166,.38) !important;
+  color: #121416 !important;
+  transform: translateY(-5px) !important;
+  box-shadow: 0 18px 45px rgba(18,20,22,.12) !important;
+}
+
+.folder-icon {
+  position: relative !important;
+  display: block !important;
+  width: 132px !important;
+  height: 96px !important;
+  margin: 22px auto 0 !important;
+  border: 2px solid #121416 !important;
+  border-radius: 12px !important;
+  background: #fbfaf5 !important;
+  box-shadow: 0 9px 0 #e0d8c9, 0 18px 34px rgba(18,20,22,.12) !important;
+  overflow: visible !important;
+}
+
+.folder-icon::before {
+  content: "" !important;
+  position: absolute !important;
+  left: -2px !important;
+  top: -22px !important;
+  width: 64px !important;
+  height: 22px !important;
+  border: 2px solid #121416 !important;
+  border-bottom: 0 !important;
+  border-radius: 10px 10px 0 0 !important;
+  background: #fbfaf5 !important;
+}
+
+.folder-icon::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 18px !important;
+  right: 18px !important;
+  top: 42px !important;
+  height: 26px !important;
+  border: 2px solid #121416 !important;
+  border-radius: 6px !important;
+  background: #f1ede3 !important;
+}
+
+.folder-icon span { display: none !important; }
+
+.folder-name {
+  display: block !important;
+  width: 100% !important;
+  max-width: 170px !important;
+  margin-top: 1.25rem !important;
+  font-size: 1.08rem !important;
+  line-height: 1.05 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.03em !important;
+  color: #121416 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.folder-count,
+.folder-preview,
+.folder-updated {
+  max-width: 168px !important;
+  color: rgba(18,20,22,.66) !important;
+}
+
+.folder-count {
+  margin-top: .6rem !important;
+  font-size: .65rem !important;
+  line-height: 1.35 !important;
+}
+
+.folder-preview {
+  margin-top: .55rem !important;
+  font-size: .76rem !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+}
+
+.folder-delete {
+  top: 2px !important;
+  right: 2px !important;
+  width: 30px !important;
+  height: 30px !important;
+  border: 2px solid #121416 !important;
+  border-radius: 999px !important;
+  background: #fbfaf5 !important;
+  color: #121416 !important;
+  opacity: 0 !important;
+  box-shadow: 0 10px 22px rgba(18,20,22,.14) !important;
+}
+.folder-shell:hover .folder-delete,
+.folder-shell:focus-within .folder-delete { opacity: 1 !important; }
+
+/* Folder/campaign view gets more breathing room and less spreadsheet feeling. */
+.folder-tabs {
+  margin: 0 0 2.25rem !important;
+  display: flex !important;
+  gap: .8rem !important;
+}
+
+.folder-campaign-screen .grid.gap-4 {
+  gap: 1.7rem !important;
+}
+
+.folder-campaign-screen .grid.lg\:grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)) !important;
+  gap: 2rem !important;
+}
+
+.pixel-panel {
+  background: #f1ede3 !important;
+  border-color: rgba(18,20,22,.72) !important;
+}
+
+.campaign-card-completed::after {
+  background: #f1ede3 !important;
+  color: #121416 !important;
+  border: 2px solid #121416 !important;
+  border-radius: 999px !important;
+}
+
+.campaign-card-completed,
+.folder-card-completed,
+.folder-shell-completed {
+  outline: none !important;
+  text-decoration: none !important;
+}
+
+.pixel-flow-canvas {
+  background:
+    linear-gradient(rgba(18,20,22,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18,20,22,.05) 1px, transparent 1px),
+    #fbfaf5 !important;
+  background-size: 34px 34px !important;
+  border-radius: 18px !important;
+}
+
+.pixel-node {
+  border-width: 2px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 18px 42px rgba(18,20,22,.1) !important;
+}
+
+.pixel-node-active {
+  background: #121416 !important;
+  color: #fbfaf5 !important;
+}
+
+.pixel-node-accent,
+.choice-card-active,
+.step-dot-active,
+.pixel-alert {
+  background: #d7c5a6 !important;
+  color: #121416 !important;
+  border-color: #121416 !important;
+}
+
+@media (max-width: 900px) {
+  .desktop-header,
+  .folder-campaign-header { flex-direction: column !important; }
+  .desktop-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(154px, 154px)) !important;
+    gap: 3.5rem 2rem !important;
+  }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 154px !important; }
+  .folder-icon { width: 118px !important; height: 88px !important; }
+}
+
+@media (max-width: 640px) {
+  .desktop-screen,
+  .folder-campaign-screen {
+    width: calc(100% - .8rem) !important;
+    padding-inline: 1rem !important;
+    border-radius: 18px !important;
+  }
+  .desktop-titlebar { margin-inline: -1rem !important; }
+  .desktop-icon-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 2.75rem 1rem !important;
+  }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 100% !important; }
+  .folder-delete { opacity: 1 !important; }
+}
