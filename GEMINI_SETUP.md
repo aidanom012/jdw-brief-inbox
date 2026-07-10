@@ -39,6 +39,16 @@ The Gemini route is designed to call Gemini once per click. It asks for a compac
 
 This keeps output tokens down and reduces invalid JSON issues because Gemini no longer has to generate boilerplate fields that the app can create itself.
 
-The route also sends a JSON schema to Gemini using `responseMimeType: "application/json"` and `responseJsonSchema`.
+The route sends a compact response schema to Gemini using `responseMimeType: "application/json"` and `responseSchema`. The parser also accepts the older full `JDW_CAMPAIGN_BRIEF_V1` / `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape if Gemini ignores the compact instruction.
 
 If Gemini still returns malformed text, the backend tries local JSON extraction only. It does not spend another Gemini request trying to repair the same output.
+
+
+## July parser hardening
+
+The AI panel now sits below the manual build section. The backend accepts both compact extraction JSON and complete JDW brief JSON, so older/full outputs do not fail just because they are not compact. If Gemini output is cut off by max tokens, the app shows that as a cut-off response instead of spending another Gemini request.
+
+
+## July 2026 hardening
+
+The backend now uses the Gemini Interactions API first with `response_format` JSON schema and `store: false`. The older generateContent route is only retained as a model-availability fallback. The AI panel is rendered below the manual builder inputs.

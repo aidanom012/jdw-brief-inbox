@@ -4,7 +4,7 @@ Soft Finder Desktop style pass for the JDW swipe/funnel brief builder.
 
 ## Gemini Brief Parser
 
-The `/new` flow is now an AI-assisted build studio. Paste messy James-style messages into **James Talk Import**, generate structured JSON, answer the missing-info prompts, then review and edit the populated builder before saving.
+The `/new` flow is now an AI-assisted build studio. Use the manual builder as the main flow. The **James Talk Import** Gemini helper now sits below the manual section; paste messy James-style messages there only when you want AI to structure the brief before review/save.
 
 The Gemini API key is server-only. Set these locally and in Vercel:
 
@@ -54,8 +54,8 @@ The `/new` page includes a Gemini parser for pasting messy James-style notes int
 Current backend flow:
 
 1. Frontend sends only the raw pasted brief to `app/api/gemini/brief/route.ts`.
-2. Gemini returns a compact extraction object with `briefs[]`.
-3. `lib/gemini-brief.ts` converts that compact output into the full app schema locally.
+2. Gemini is instructed to return a compact extraction object with `briefs[]`. The backend can also accept the older full JDW brief shape if Gemini returns it anyway.
+3. `lib/gemini-brief.ts` converts compact output into the full app schema locally, or validates a complete JDW brief/batch directly.
 4. Existing Zod validation/checklist logic validates the generated brief.
 5. The UI loads the brief for review; it does not auto-save.
 
@@ -70,4 +70,4 @@ GEMINI_MAX_OUTPUT_TOKENS=4096
 GEMINI_FALLBACK_MODELS=
 ```
 
-Leave `GEMINI_FALLBACK_MODELS` blank for normal use. Invalid JSON/validation errors do not trigger another model call.
+Leave `GEMINI_FALLBACK_MODELS` blank for normal use. Invalid JSON/validation errors do not trigger another model call. Cut-off JSON is reported clearly so tokens are not wasted on repair attempts.

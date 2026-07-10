@@ -33,8 +33,30 @@ type GeminiGenerateContentResponse = {
         text?: string;
       }>;
     };
+    finishReason?: string;
   }>;
   usageMetadata?: GeminiUsageMetadata;
+  error?: {
+    message?: string;
+  };
+};
+
+type GeminiInteractionResponse = {
+  status?: string;
+  output_text?: string;
+  outputText?: string;
+  steps?: Array<{
+    type?: string;
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+  usage?: {
+    total_input_tokens?: number;
+    total_output_tokens?: number;
+    total_tokens?: number;
+  };
   error?: {
     message?: string;
   };
@@ -123,11 +145,14 @@ export class GeminiBriefError extends Error {
   }
 }
 
-const GEMINI_BRIEF_PROMPT = `Extract campaign brief data from the raw JDW / James Walker note.
-Return JSON only matching the response schema. No markdown. No prose.
+const GEMINI_BRIEF_PROMPT = `You are an extraction engine, not a copywriter.
+Extract campaign data from a raw JDW / James Walker note into the compact JSON schema supplied by the API response_format.
+Return ONLY the compact object with top-level key "briefs".
+NEVER output JDW_CAMPAIGN_BRIEF_V1, JDW_CAMPAIGN_BRIEF_BATCH_V1, source, build, campaign, budget, missing_required_fields, or the full app schema.
 Use empty strings or empty arrays when information is missing. Do not guess.
 Preserve exact supplied values for ACID, ASID, budgets, dates, links, pixel, account, platform, targeting, copy, post URLs, boost codes, and asset links.
-If the note contains multiple distinct campaign setups, return one item per setup in briefs[]. Do not merge separate campaigns.`;
+If there are multiple distinct campaign setups, return one item per setup in briefs[].
+Keep notes short. Do not repeat the raw brief.`;
 
 function objectSchema(
   properties: Record<string, JsonSchema>,
@@ -135,7 +160,6 @@ function objectSchema(
 ): JsonSchema {
   return {
     type: "object",
-    additionalProperties: false,
     properties,
     required: Object.keys(properties),
     ...(propertyOrdering ? { propertyOrdering } : {})
@@ -324,6 +348,41 @@ function extractGenerateContentText(response: GeminiGenerateContentResponse): st
   return text;
 }
 
+function extractInteractionText(response: GeminiInteractionResponse): string {
+  const directText = (response.output_text || response.outputText || "").trim();
+  if (directText) {
+    return directText;
+  }
+
+  const modelOutputTexts = (response.steps || [])
+    .filter((step) => step.type === "model_output")
+    .flatMap((step) => step.content || [])
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+
+  if (!modelOutputTexts) {
+    throw new GeminiBriefError("Gemini did not return any JSON.", 502);
+  }
+
+  return modelOutputTexts;
+}
+
+function interactionUsageToGeminiUsage(
+  usage: GeminiInteractionResponse["usage"] | undefined
+): GeminiUsageMetadata | undefined {
+  if (!usage) {
+    return undefined;
+  }
+
+  return {
+    promptTokenCount: usage.total_input_tokens,
+    candidatesTokenCount: usage.total_output_tokens,
+    totalTokenCount: usage.total_tokens
+  };
+}
+
 function stripMarkdownJsonFence(text: string): string {
   return text
     .trim()
@@ -388,6 +447,10 @@ function findBalancedJsonCandidate(text: string): string | null {
 }
 
 function normaliseGeneratedJsonShape(value: unknown): unknown {
+  if (isGeneratedBriefObject(value)) {
+    return value;
+  }
+
   if (Array.isArray(value)) {
     const briefObjects = value.filter(isJsonObject);
     if (briefObjects.length > 0) {
@@ -401,10 +464,6 @@ function normaliseGeneratedJsonShape(value: unknown): unknown {
     return value;
   }
 
-  if (isGeneratedBriefObject(value)) {
-    return value;
-  }
-
   if (isJsonObject(value)) {
     return {
       briefs: [value]
@@ -414,7 +473,7 @@ function normaliseGeneratedJsonShape(value: unknown): unknown {
   return value;
 }
 
-function parseJsonOnly(text: string): unknown {
+function parseJsonOnly(text: string, finishReason?: string): unknown {
   const attempts = [text.trim(), stripMarkdownJsonFence(text)];
   const balancedCandidate = findBalancedJsonCandidate(text);
   if (balancedCandidate) {
@@ -430,8 +489,14 @@ function parseJsonOnly(text: string): unknown {
     }
   }
 
-  throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502, [
-    stripMarkdownJsonFence(text).slice(0, 500)
+  const cleaned = stripMarkdownJsonFence(text);
+  const looksCutOff = !balancedCandidate || finishReason === "MAX_TOKENS";
+  const message = looksCutOff
+    ? "Gemini returned JSON-looking text, but it was cut off before it became valid JSON. The app did not spend another request trying to repair it."
+    : "Gemini returned text that was not valid JSON.";
+
+  throw new GeminiBriefError(message, 502, [
+    cleaned.slice(0, 900)
   ]);
 }
 
@@ -807,11 +872,29 @@ function compactPayloadToJdwPayload(value: unknown): unknown {
   }
 
   const normalized = normaliseGeneratedJsonShape(value);
+  if (isGeneratedBriefObject(normalized)) {
+    return normalized;
+  }
+
   if (!isJsonObject(normalized) || !Array.isArray(normalized.briefs)) {
     return normalized;
   }
 
-  const briefs = normalized.briefs.map(compactBriefToJdw);
+  const rawBriefs = normalized.briefs;
+  const allAlreadyFullBriefs = rawBriefs.length > 0 && rawBriefs.every(
+    (brief) => isJsonObject(brief) && brief.brief_version === "JDW_CAMPAIGN_BRIEF_V1"
+  );
+
+  if (allAlreadyFullBriefs) {
+    return rawBriefs.length === 1
+      ? rawBriefs[0]
+      : {
+          brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
+          briefs: rawBriefs
+        };
+  }
+
+  const briefs = rawBriefs.map(compactBriefToJdw);
   if (briefs.length === 1) {
     return briefs[0];
   }
@@ -819,6 +902,55 @@ function compactPayloadToJdwPayload(value: unknown): unknown {
   return {
     brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
     briefs
+  };
+}
+
+async function generateWithInteractionsApi(
+  apiKey: string,
+  model: string,
+  rawBrief: string
+): Promise<{ generated: unknown; usage?: GeminiUsageMetadata }> {
+  const endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions";
+  const body = {
+    model,
+    input: `Raw JDW brief:\n${rawBrief}`,
+    system_instruction: GEMINI_BRIEF_PROMPT,
+    store: false,
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema: compactResponseJsonSchema
+    },
+    generation_config: {
+      temperature: 0,
+      top_p: 0.1,
+      thinking_level: "minimal",
+      max_output_tokens: configuredMaxOutputTokens()
+    }
+  };
+
+  const { response, payload } = await postGeminiJson(endpoint, apiKey, body);
+
+  if (!response.ok) {
+    const message =
+      response.status === 503
+        ? "Gemini is temporarily overloaded. Try the same brief again in a moment."
+        : "Gemini could not generate this brief.";
+
+    throw new GeminiBriefError(message, 502, [
+      apiIssue("Interactions API", model, response, payload)
+    ]);
+  }
+
+  const typedPayload = payload as GeminiInteractionResponse;
+  const parsed = parseJsonOnly(
+    extractInteractionText(typedPayload),
+    typedPayload.status === "incomplete" ? "MAX_TOKENS" : undefined
+  );
+
+  return {
+    generated: compactPayloadToJdwPayload(parsed),
+    usage: interactionUsageToGeminiUsage(typedPayload.usage)
   };
 }
 
@@ -851,7 +983,7 @@ async function generateWithGenerateContentApi(
       candidateCount: 1,
       maxOutputTokens: configuredMaxOutputTokens(),
       responseMimeType: "application/json",
-      responseJsonSchema: compactResponseJsonSchema
+      responseSchema: compactResponseJsonSchema
     }
   };
 
@@ -869,7 +1001,8 @@ async function generateWithGenerateContentApi(
   }
 
   const typedPayload = payload as GeminiGenerateContentResponse;
-  const parsed = parseJsonOnly(extractGenerateContentText(typedPayload));
+  const candidate = typedPayload.candidates?.[0];
+  const parsed = parseJsonOnly(extractGenerateContentText(typedPayload), candidate?.finishReason);
   return {
     generated: compactPayloadToJdwPayload(parsed),
     usage: typedPayload.usageMetadata
@@ -913,7 +1046,7 @@ export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBrief
 
   for (const model of configuredModels()) {
     try {
-      const result = await generateWithGenerateContentApi(apiKey, model, rawBrief);
+      const result = await generateWithInteractionsApi(apiKey, model, rawBrief);
       return validateGeneratedBrief(result.generated, result.usage);
     } catch (error) {
       if (!(error instanceof GeminiBriefError)) {
@@ -921,9 +1054,30 @@ export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBrief
       }
 
       lastError = error;
-      if (!shouldTryNextModel(error)) {
-        throw error;
+      if (shouldTryNextModel(error)) {
+        continue;
       }
+
+      // Only fall back to the legacy generateContent API when the Interactions
+      // endpoint/model itself is unavailable. Do not spend extra tokens trying
+      // to repair invalid JSON; the parsing error is returned immediately.
+      const detail = [error.message, ...(error.issues || [])].join(" ").toLowerCase();
+      if (/interactions api/.test(detail) && /404|not found|not supported|no longer available|not available/.test(detail)) {
+        try {
+          const legacyResult = await generateWithGenerateContentApi(apiKey, model, rawBrief);
+          return validateGeneratedBrief(legacyResult.generated, legacyResult.usage);
+        } catch (legacyError) {
+          if (legacyError instanceof GeminiBriefError) {
+            lastError = legacyError;
+            if (shouldTryNextModel(legacyError)) {
+              continue;
+            }
+          }
+          throw legacyError;
+        }
+      }
+
+      throw error;
     }
   }
 

@@ -1130,13 +1130,6 @@ export function NewBriefForm({
   return (
     <div className="one-by-one-builder">
       <div className="builder-command-center">
-        {!briefId ? (
-          <GeminiBriefPanel
-            onGenerated={(json, validation, message) =>
-              applyValidatedJson(json, validation, message)
-            }
-          />
-        ) : null}
         <BuildManual />
       </div>
 
@@ -2056,6 +2049,14 @@ export function NewBriefForm({
           />
         ) : null}
       </div>
+
+      {!briefId ? (
+        <GeminiBriefPanel
+          onGenerated={(json, validation, message) =>
+            applyValidatedJson(json, validation, message)
+          }
+        />
+      ) : null}
 
       <div className="wizard-controls pixel-window p-4">
         <button
