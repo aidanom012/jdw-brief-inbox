@@ -854,3 +854,398 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
   .pixel-node { padding: 1rem !important; }
   .theme-control-panel { position: fixed; top: 5.5rem; left: 1rem; right: 1rem; width: auto; }
 }
+
+/* CLEAN MONO DESKTOP PASS
+   Strict black/white by default. Salmon only appears on hover/focus/accent actions. */
+:root {
+  color-scheme: light;
+  --bg: #000000;
+  --ink: #000000;
+  --paper: #ffffff;
+  --paper-2: #ffffff;
+  --wash: #000000;
+  --line: #000000;
+  --accent: #eb5160;
+  --accent-soft: #ffffff;
+  --done: #000000;
+  --done-soft: #ffffff;
+}
+
+html,
+body {
+  background: var(--bg) !important;
+  color: var(--paper) !important;
+}
+
+body::before {
+  background:
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px) !important;
+  background-size: 34px 34px !important;
+  mask-image: none !important;
+}
+
+.pixel-window,
+.pixel-card,
+.pixel-ad-card,
+.pixel-stat,
+.pixel-panel,
+.pixel-detail-panel,
+.field,
+.choice-card,
+.folder-card,
+.pixel-node,
+.folder-campaign-screen,
+.desktop-screen,
+.empty-desktop-panel {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--ink) !important;
+  box-shadow: none !important;
+}
+
+.pixel-window::before { background: var(--paper) !important; border-color: var(--ink) !important; }
+.pixel-muted,
+.helper-copy,
+.field::placeholder { color: rgba(0,0,0,.72) !important; }
+.pixel-label { color: var(--ink) !important; }
+
+/* Top nav: black app shell, white controls. */
+header { background: var(--bg) !important; border-color: var(--paper) !important; }
+header .nav-chip,
+header .theme-control-wrap > button,
+header a[href="/inbox"]:not(:first-child),
+header a[href="/new"],
+header a[href="/logout"] {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--paper) !important;
+}
+header .nav-chip:hover,
+header .theme-control-wrap > button:hover,
+header a:hover {
+  background: var(--paper) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Buttons are mono until hover. */
+.pixel-button,
+.mini-button.safe,
+.nav-chip-active,
+.pixel-tab-active,
+.pixel-node-active {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+}
+.nav-chip,
+.mini-button,
+.pixel-tab,
+.pixel-flow-chip,
+.quick-summary span,
+.autosave-chip {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--ink) !important;
+}
+.pixel-button:hover,
+.nav-chip:hover,
+.mini-button:hover,
+.pixel-tab:hover,
+.choice-card:hover,
+.pixel-node:hover,
+.folder-card:hover,
+.recent-campaign-chip:hover {
+  background: var(--paper) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  transform: translate(-2px, -2px);
+}
+.pixel-button:hover { background: var(--accent) !important; color: var(--paper) !important; border-color: var(--accent) !important; }
+.mini-button.danger,
+.pixel-alert,
+.choice-card-active,
+.step-dot-active {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+}
+.mini-button.danger:hover { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--paper) !important; }
+.step-dot-active { background: var(--ink) !important; }
+
+/* Desktop home: one clear PC-style desktop, no quick-open section. */
+.desktop-screen,
+.folder-campaign-screen {
+  width: 100%;
+  min-height: calc(100vh - 155px);
+  border: 4px solid var(--paper) !important;
+  outline: 3px solid var(--ink);
+  background:
+    linear-gradient(rgba(0,0,0,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px),
+    var(--paper) !important;
+  background-size: 36px 36px !important;
+  padding: 0 1.5rem 2rem;
+  overflow: hidden;
+}
+.desktop-titlebar {
+  height: 32px;
+  margin: 0 -1.5rem 1.7rem;
+  border-bottom: 4px solid var(--ink);
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+}
+.desktop-titlebar span {
+  width: 10px;
+  height: 18px;
+  background: var(--ink);
+  display: block;
+}
+.desktop-header,
+.folder-campaign-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2.4rem;
+}
+.desktop-header h1,
+.folder-campaign-header h1 {
+  margin-top: .35rem;
+  font-size: clamp(2.35rem, 5vw, 4.7rem);
+  line-height: .9;
+  font-weight: 950;
+  letter-spacing: -.055em;
+}
+.desktop-header p:not(.pixel-label),
+.folder-campaign-header p:not(.pixel-label) {
+  margin-top: .85rem;
+  max-width: 680px;
+  font-weight: 800;
+  line-height: 1.55;
+  color: rgba(0,0,0,.72);
+}
+.desktop-new-button { align-self: flex-start; min-width: 190px; text-align: center; }
+
+.desktop-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+  gap: 3.2rem 3rem;
+  align-items: start;
+  padding: 1rem .35rem 2rem;
+}
+.folder-shell.desktop-folder {
+  min-height: 0;
+  position: relative;
+  animation: folder-in .24s cubic-bezier(.2,.85,.18,1) both;
+  animation-delay: var(--folder-delay, 0ms);
+}
+.folder-card {
+  min-height: 0 !important;
+  height: auto !important;
+  border: 0 !important;
+  background: transparent !important;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: .2rem !important;
+  text-decoration: none;
+  transition: transform .18s cubic-bezier(.2,.9,.2,1), color .18s ease;
+}
+.folder-card:hover {
+  background: transparent !important;
+  color: var(--accent) !important;
+  transform: translateY(-6px) !important;
+}
+.folder-icon {
+  width: 126px !important;
+  height: 90px !important;
+  border: 5px solid var(--ink) !important;
+  background: var(--paper) !important;
+  position: relative;
+  display: block;
+  transition: border-color .18s ease, transform .18s cubic-bezier(.2,.9,.2,1);
+}
+.folder-icon::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: -28px;
+  width: 64px;
+  height: 28px;
+  border: 5px solid var(--ink) !important;
+  border-bottom: 0 !important;
+  background: var(--paper) !important;
+}
+.folder-icon::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 18px;
+  height: 0;
+  background: var(--accent);
+  transition: height .16s ease;
+}
+.folder-icon span {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  height: 32px;
+  border: 4px solid var(--ink) !important;
+  background: var(--paper) !important;
+}
+.folder-card:hover .folder-icon,
+.folder-card:hover .folder-icon::before,
+.folder-card:hover .folder-icon span { border-color: var(--accent) !important; }
+.folder-card:hover .folder-icon::after { height: 10px; }
+.folder-name {
+  display: block;
+  margin-top: 1rem;
+  max-width: 180px;
+  font-size: 1.18rem;
+  line-height: 1.05;
+  font-weight: 950;
+  letter-spacing: -.02em;
+  word-break: break-word;
+}
+.folder-count,
+.folder-preview,
+.folder-updated {
+  display: block;
+  max-width: 190px;
+  color: rgba(0,0,0,.72);
+}
+.folder-count {
+  margin-top: .55rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: .65rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .11em;
+}
+.folder-preview {
+  margin-top: .55rem;
+  font-size: .78rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+.folder-updated {
+  margin-top: .7rem;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  padding: .32rem .42rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: .58rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.folder-card:hover .folder-updated { border-color: var(--accent); color: var(--accent); }
+.folder-delete {
+  top: -1.2rem !important;
+  right: 1.2rem !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 3px solid var(--ink) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  opacity: .92;
+}
+.folder-delete:hover { background: var(--accent) !important; color: var(--paper) !important; border-color: var(--accent) !important; }
+.folder-card-completed,
+.campaign-card-completed { outline: none !important; }
+.folder-card-completed .folder-title-text,
+.folder-card-completed .folder-project-text,
+.campaign-card-completed .campaign-title-text,
+.campaign-card-completed .campaign-project-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+  text-decoration-color: var(--ink);
+}
+.folder-card-completed .folder-updated,
+.completed-chip,
+.campaign-card-completed::after {
+  background: var(--ink) !important;
+  color: var(--paper) !important;
+  border-color: var(--ink) !important;
+}
+
+.empty-desktop-panel {
+  border: 4px solid var(--ink);
+  padding: 4rem 2rem;
+  text-align: center;
+  max-width: 720px;
+  margin: 4rem auto;
+}
+.empty-desktop-panel h2 { margin-top: .5rem; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 950; letter-spacing: -.04em; }
+.empty-desktop-panel p:not(.pixel-label) { margin-top: .75rem; font-weight: 800; color: rgba(0,0,0,.72); }
+
+/* Inside an artist folder: campaigns are the files in that folder. */
+.folder-campaign-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+.folder-tabs { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: -1rem; }
+.folder-campaign-screen .pixel-window,
+.folder-campaign-screen .pixel-card { background: var(--paper) !important; }
+.folder-campaign-screen .grid.lg\:grid-cols-2 { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 1.15rem; }
+
+/* Campaign cards: cleaner file cards. */
+.campaign-card-completed::after { display: none; }
+.pixel-window:has(.campaign-title-text) {
+  transition: transform .18s cubic-bezier(.2,.9,.2,1), border-color .18s ease, color .18s ease;
+}
+.pixel-window:has(.campaign-title-text):hover {
+  transform: translateY(-4px);
+  border-color: var(--accent) !important;
+}
+.pixel-window:has(.campaign-title-text):hover .campaign-title-text { color: var(--accent); }
+
+/* Colour panel is still available, but it is now a small utility, not a visual centrepiece. */
+.theme-control-panel {
+  width: min(290px, calc(100vw - 2rem)) !important;
+  border: 3px solid var(--ink) !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+  padding: .8rem !important;
+}
+.theme-colour-row { padding: .5rem .6rem !important; border-width: 2px !important; }
+.theme-colour-row input { width: 38px !important; height: 28px !important; }
+
+/* Funnel and drawers remain big, but mono until hover. */
+.pixel-flow-canvas {
+  background:
+    linear-gradient(rgba(0,0,0,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,.045) 1px, transparent 1px),
+    var(--paper) !important;
+  background-size: 40px 40px !important;
+}
+.pixel-node-accent,
+.pixel-node-soft { background: var(--paper) !important; color: var(--ink) !important; }
+.pixel-node-accent .pixel-label,
+.pixel-node-soft .pixel-label { color: var(--ink) !important; }
+.pixel-node-active { background: var(--ink) !important; color: var(--paper) !important; }
+.pixel-node-active .pixel-label { color: var(--paper) !important; }
+
+@media (max-width: 900px) {
+  .desktop-header,
+  .folder-campaign-header { display: grid; gap: 1.2rem; }
+  .desktop-icon-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2.5rem 1.5rem; }
+  .folder-icon { transform: scale(.9); transform-origin: center; }
+  .folder-delete { right: .35rem !important; }
+}
+
+@media (max-width: 640px) {
+  .desktop-screen,
+  .folder-campaign-screen { padding: 0 1rem 1.25rem; min-height: calc(100vh - 125px); }
+  .desktop-titlebar { margin: 0 -1rem 1.2rem; height: 26px; }
+  .desktop-icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.4rem 1rem; }
+  .desktop-header h1,
+  .folder-campaign-header h1 { font-size: clamp(2.2rem, 12vw, 3.6rem); }
+  .desktop-new-button { width: 100%; }
+  .folder-name { max-width: 140px; font-size: 1rem; }
+  .folder-count, .folder-preview, .folder-updated { max-width: 140px; }
+}

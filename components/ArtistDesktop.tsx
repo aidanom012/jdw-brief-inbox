@@ -33,10 +33,6 @@ function updatedLabel(briefs: BriefRow[]): string {
 }
 
 export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
-  const recentBriefs = [...briefs]
-    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
-    .slice(0, 5);
-
   const groups = Array.from(
     briefs.reduce((map, brief) => {
       const artist = folderName(brief.artist);
@@ -46,50 +42,34 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
   ).sort(([a], [b]) => a.localeCompare(b));
 
   return (
-    <section className="desktop-wrap pixel-window p-4 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <section className="desktop-screen animate-rise">
+      <div className="desktop-titlebar" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+
+      <div className="desktop-header">
         <div>
-          <p className="pixel-label">8-bit desktop</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight">Artist folders</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold pixel-muted">
-            Open an artist folder to see the campaigns/projects inside. New manual briefs remember artists and projects for next time.
+          <p className="pixel-label">Desktop</p>
+          <h1>Artist folders</h1>
+          <p>
+            Open a folder to view that artist&apos;s campaigns. New briefs save back into the matching artist folder automatically.
           </p>
         </div>
-        <Link href="/new" className="pixel-button focus-ring px-5 py-4 text-sm">
+        <Link href="/new" className="pixel-button focus-ring desktop-new-button">
           + Start new brief
         </Link>
       </div>
 
-
-      {recentBriefs.length > 0 ? (
-        <div className="mb-6 pixel-card p-4">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="pixel-label">Recent campaigns</p>
-              <h2 className="mt-1 text-2xl font-black">Quick open</h2>
-            </div>
-            <Link href="/inbox" className="mini-button focus-ring">View inbox</Link>
-          </div>
-          <div className="recent-campaigns-strip">
-            {recentBriefs.map((brief) => (
-              <Link key={brief.id} href={`/brief/${brief.id}`} className={`recent-campaign-chip focus-ring ${brief.status === "done" ? "recent-campaign-chip-done" : ""}`}>
-                <span className="pixel-label block">{brief.platform || "Campaign"}</span>
-                <strong>{brief.artist || "Unknown"}</strong>
-                <span>{brief.release_title || "No project"}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {groups.length === 0 ? (
-        <div className="pixel-card p-8 text-center">
+        <div className="empty-desktop-panel">
           <p className="pixel-label">Empty desktop</p>
-          <h2 className="mt-2 text-2xl font-black">No artist folders yet.</h2>
-          <p className="mt-2 font-semibold pixel-muted">Make your first brief and the folder appears here.</p>
+          <h2>No artist folders yet.</h2>
+          <p>Make your first brief and the folder appears here.</p>
         </div>
       ) : (
-        <div className="desktop-grid">
+        <div className="desktop-icon-grid" aria-label="Artist folders">
           {groups.map(([artist, artistBriefs], index) => {
             const projects = uniqueProjects(artistBriefs);
             const draftCount = artistBriefs.filter((brief) => brief.status !== "done").length;
@@ -98,24 +78,25 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
             return (
               <div
                 key={artist}
-                className={`folder-shell ${isCompletedFolder ? "folder-shell-completed" : ""}`}
-                style={{ "--folder-delay": `${Math.min(index, 14) * 24}ms` } as CSSProperties}
+                className={`folder-shell desktop-folder ${isCompletedFolder ? "folder-shell-completed" : ""}`}
+                style={{ "--folder-delay": `${Math.min(index, 20) * 22}ms` } as CSSProperties}
               >
                 <Link
                   href={`/inbox?artist=${encodeURIComponent(artist)}`}
                   className={`folder-card focus-ring ${isCompletedFolder ? "folder-card-completed" : ""}`}
+                  aria-label={`Open ${artist} folder`}
                 >
                   <span className="folder-icon" aria-hidden="true">
                     <span />
                   </span>
-                  <span className="mt-3 block text-xl font-black leading-tight folder-title-text">{artist}</span>
-                  <span className="mt-2 block font-mono text-xs font-black uppercase tracking-[0.12em] pixel-muted">
-                    {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"} · {draftCount} draft · {completedCount} completed
+                  <span className="folder-name folder-title-text">{artist}</span>
+                  <span className="folder-count">
+                    {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"} · {draftCount} draft · {completedCount} done
                   </span>
-                  <span className="mt-3 block truncate text-sm font-bold pixel-muted folder-project-text">
-                    {projects.length ? projects.slice(0, 3).join(" / ") : "No project name yet"}
+                  <span className="folder-project-text folder-preview">
+                    {projects.length ? projects.slice(0, 2).join(" / ") : "No project yet"}
                   </span>
-                  <span className="mt-4 inline-block border-2 border-black px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.12em]">
+                  <span className="folder-updated">
                     {isCompletedFolder ? "completed" : `updated ${updatedLabel(artistBriefs)}`}
                   </span>
                 </Link>

@@ -2,7 +2,7 @@ export function ThemeScript() {
   const code = `
     (function () {
       try {
-        var raw = window.localStorage.getItem('jdw_pixel_theme_v1');
+        var raw = window.localStorage.getItem('jdw_pixel_theme_v2');
         if (!raw) return;
         var theme = JSON.parse(raw);
         var root = document.documentElement;

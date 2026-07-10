@@ -19,7 +19,7 @@ const DEFAULT_THEME: Theme = {
 const PRESETS: { label: string; theme: Theme }[] = [
   { label: "Mono", theme: DEFAULT_THEME },
   {
-    label: "Red",
+    label: "Salmon",
     theme: {
       bg: "#000000",
       ink: "#000000",
@@ -27,27 +27,9 @@ const PRESETS: { label: string; theme: Theme }[] = [
       accent: "#eb5160",
     },
   },
-  {
-    label: "Blue",
-    theme: {
-      bg: "#000000",
-      ink: "#000000",
-      paper: "#ffffff",
-      accent: "#3b82f6",
-    },
-  },
-  {
-    label: "Green",
-    theme: {
-      bg: "#000000",
-      ink: "#000000",
-      paper: "#ffffff",
-      accent: "#22c55e",
-    },
-  },
 ];
 
-const STORAGE_KEY = "jdw_pixel_theme_v1";
+const STORAGE_KEY = "jdw_pixel_theme_v2";
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -116,7 +98,7 @@ export function ColorControlPanel() {
             <div>
               <p className="pixel-label">Colour panel</p>
               <p className="mt-1 text-xs font-black uppercase tracking-[0.08em]">
-                High contrast by default
+                Mono by default
               </p>
             </div>
             <button
@@ -128,7 +110,7 @@ export function ColorControlPanel() {
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {PRESETS.map((preset) => (
               <button
                 key={preset.label}
