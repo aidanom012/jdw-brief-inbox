@@ -1,5 +1,9 @@
-# JDW Mono Desktop Clean Build Notes
+# Build notes
 
-- `npm run typecheck` passed.
-- `NEXT_TELEMETRY_DISABLED=1 npm run build` passed and generated pages.
-- No Supabase update required.
+Validated in sandbox:
+
+- npm ci ✅
+- npm run typecheck ✅
+- next build compiled, type/lint checks passed, static pages generated ✅
+
+The sandbox timed out during Next's final build trace collection after static pages generated.

@@ -1249,3 +1249,441 @@ header a:hover {
   .folder-name { max-width: 140px; font-size: 1rem; }
   .folder-count, .folder-preview, .folder-updated { max-width: 140px; }
 }
+
+/* FINAL DESKTOP FIX: strict black/white, no saved colours, clean square folder tiles. */
+:root {
+  color-scheme: light !important;
+  --bg: #ffffff !important;
+  --ink: #000000 !important;
+  --paper: #ffffff !important;
+  --paper-2: #ffffff !important;
+  --wash: #ffffff !important;
+  --line: #000000 !important;
+  --accent: #eb5160 !important;
+  --accent-soft: #ffffff !important;
+  --done: #000000 !important;
+  --done-soft: #ffffff !important;
+}
+
+html,
+body {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+body::before { display: none !important; }
+
+.top-shell {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #ffffff;
+  border-bottom: 3px solid #000000;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  border: 0 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  padding: .65rem 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.05rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  text-decoration: none;
+}
+
+.brand-mark:hover,
+.top-nav .nav-chip:hover {
+  color: var(--accent) !important;
+}
+
+.top-nav .nav-chip {
+  border: 0 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  padding: .7rem .75rem;
+}
+
+.pixel-window,
+.pixel-card,
+.pixel-ad-card,
+.pixel-stat,
+.pixel-panel,
+.pixel-detail-panel,
+.field,
+.choice-card,
+.pixel-node,
+.folder-campaign-screen,
+.desktop-screen,
+.empty-desktop-panel {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+}
+
+.pixel-window::before,
+.desktop-titlebar {
+  background: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+.pixel-button,
+.mini-button.safe,
+.nav-chip-active,
+.pixel-tab-active,
+.pixel-node-active {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+.nav-chip,
+.mini-button,
+.pixel-tab,
+.pixel-flow-chip,
+.quick-summary span,
+.autosave-chip {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.pixel-button:hover,
+.nav-chip:hover,
+.mini-button:hover,
+.pixel-tab:hover,
+.choice-card:hover,
+.pixel-node:hover,
+.recent-campaign-chip:hover {
+  background: #ffffff !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  transform: translate(-2px, -2px);
+}
+
+.pixel-button:hover,
+.mini-button.danger:hover {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  border-color: var(--accent) !important;
+}
+
+/* Home desktop becomes a simple white PC desktop, not a busy card. */
+.desktop-screen,
+.folder-campaign-screen {
+  width: 100%;
+  min-height: calc(100vh - 128px);
+  border: 3px solid #000000 !important;
+  outline: 0 !important;
+  background:
+    linear-gradient(rgba(0,0,0,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,.045) 1px, transparent 1px),
+    #ffffff !important;
+  background-size: 40px 40px !important;
+  padding: 0 1.5rem 2.5rem !important;
+  overflow: visible !important;
+}
+
+.desktop-titlebar {
+  height: 30px !important;
+  margin: 0 -1.5rem 1.8rem !important;
+  border-bottom: 3px solid #000000 !important;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 12px;
+}
+
+.desktop-titlebar span {
+  width: 10px !important;
+  height: 18px !important;
+  background: #000000 !important;
+  display: block;
+}
+
+.desktop-header,
+.folder-campaign-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 3.2rem !important;
+}
+
+.desktop-header h1,
+.folder-campaign-header h1 {
+  margin-top: .35rem;
+  font-size: clamp(2.6rem, 5.8vw, 5.4rem) !important;
+  line-height: .88 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.065em !important;
+}
+
+.desktop-header p:not(.pixel-label),
+.folder-campaign-header p:not(.pixel-label) {
+  margin-top: .85rem;
+  max-width: 700px;
+  color: rgba(0,0,0,.72) !important;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+/* Folder grid: desktop icons with enough breathing room. */
+.desktop-icon-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 168px)) !important;
+  justify-content: start !important;
+  align-items: start !important;
+  gap: 64px 58px !important;
+  padding: .5rem 1rem 3rem !important;
+}
+
+.folder-shell,
+.folder-shell.desktop-folder {
+  position: relative !important;
+  width: 168px !important;
+  min-height: 205px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.folder-card,
+.folder-shell .folder-card {
+  width: 168px !important;
+  min-height: 188px !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  padding: 14px 10px 12px !important;
+  border: 3px solid transparent !important;
+  background: transparent !important;
+  color: #000000 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  transform: none !important;
+}
+
+.folder-card:hover {
+  border-color: var(--accent) !important;
+  background: #ffffff !important;
+  color: var(--accent) !important;
+  transform: translateY(-4px) !important;
+}
+
+/* Folder icon: no negative-position tab, so nothing can clip into surrounding UI. */
+.folder-icon {
+  position: relative !important;
+  display: block !important;
+  width: 104px !important;
+  height: 82px !important;
+  margin: 0 auto !important;
+  border: 0 !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+.folder-icon::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 1 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 50px !important;
+  height: 20px !important;
+  border: 4px solid #000000 !important;
+  border-bottom: 0 !important;
+  background: #ffffff !important;
+}
+
+.folder-icon::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 2 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 18px !important;
+  bottom: 0 !important;
+  height: auto !important;
+  border: 4px solid #000000 !important;
+  background: #ffffff !important;
+  transition: border-color .15s ease, background-color .15s ease !important;
+}
+
+.folder-icon span {
+  position: absolute !important;
+  z-index: 3 !important;
+  left: 18px !important;
+  right: 18px !important;
+  top: 46px !important;
+  bottom: auto !important;
+  height: 22px !important;
+  border: 3px solid #000000 !important;
+  background: #ffffff !important;
+}
+
+.folder-card:hover .folder-icon::before,
+.folder-card:hover .folder-icon::after,
+.folder-card:hover .folder-icon span {
+  border-color: var(--accent) !important;
+}
+
+.folder-card:hover .folder-icon::after {
+  background: #ffffff !important;
+}
+
+.folder-name {
+  display: block !important;
+  width: 100% !important;
+  max-width: 148px !important;
+  margin-top: 12px !important;
+  font-size: 1rem !important;
+  line-height: 1.05 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.015em !important;
+  color: currentColor !important;
+  word-break: break-word !important;
+}
+
+.folder-count,
+.folder-preview,
+.folder-updated {
+  display: block !important;
+  max-width: 148px !important;
+  color: rgba(0,0,0,.62) !important;
+}
+
+.folder-count {
+  margin-top: .5rem !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: .58rem !important;
+  font-weight: 950 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .1em !important;
+  line-height: 1.35 !important;
+}
+
+.folder-preview {
+  margin-top: .42rem !important;
+  font-size: .68rem !important;
+  font-weight: 850 !important;
+  line-height: 1.2 !important;
+}
+
+.folder-updated { display: none !important; }
+
+.folder-card:hover .folder-count,
+.folder-card:hover .folder-preview {
+  color: var(--accent) !important;
+}
+
+.folder-delete {
+  position: absolute !important;
+  z-index: 6 !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  border: 3px solid #000000 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.folder-delete:hover {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  border-color: var(--accent) !important;
+  transform: translate(-1px, -1px) !important;
+}
+
+.folder-card-completed .folder-title-text,
+.folder-card-completed .folder-project-text,
+.campaign-card-completed .campaign-title-text,
+.campaign-card-completed .campaign-project-text {
+  text-decoration: line-through !important;
+  text-decoration-thickness: 3px !important;
+  text-decoration-color: #000000 !important;
+}
+
+.folder-card-completed .folder-icon::before,
+.folder-card-completed .folder-icon::after,
+.folder-card-completed .folder-icon span {
+  border-color: #000000 !important;
+}
+
+/* Artist folder pages: cleaner campaign-file layout. */
+.folder-campaign-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: .75rem !important;
+}
+
+.folder-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: .7rem !important;
+  margin-top: -1.25rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.folder-campaign-screen .grid.lg\:grid-cols-2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)) !important;
+  gap: 1.5rem !important;
+}
+
+/* Remove any leftover colour-control styling from influencing layout. */
+.theme-control-wrap,
+.theme-control-panel { display: none !important; }
+
+@media (max-width: 900px) {
+  .desktop-header,
+  .folder-campaign-header { display: grid !important; gap: 1.25rem !important; }
+  .desktop-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 150px)) !important;
+    gap: 46px 28px !important;
+    padding-inline: .25rem !important;
+  }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 150px !important; }
+  .folder-name,
+  .folder-count,
+  .folder-preview { max-width: 130px !important; }
+}
+
+@media (max-width: 640px) {
+  .desktop-screen,
+  .folder-campaign-screen {
+    padding: 0 1rem 1.5rem !important;
+    min-height: calc(100vh - 120px) !important;
+  }
+  .desktop-titlebar { margin: 0 -1rem 1.25rem !important; height: 26px !important; }
+  .desktop-icon-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 38px 14px !important;
+  }
+  .folder-shell,
+  .folder-shell.desktop-folder,
+  .folder-card,
+  .folder-shell .folder-card { width: 100% !important; }
+  .desktop-header h1,
+  .folder-campaign-header h1 { font-size: clamp(2.3rem, 14vw, 3.7rem) !important; }
+  .desktop-new-button { width: 100%; }
+}

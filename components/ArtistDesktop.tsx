@@ -18,20 +18,6 @@ function uniqueProjects(briefs: BriefRow[]): string[] {
   );
 }
 
-function updatedLabel(briefs: BriefRow[]): string {
-  const latest = briefs
-    .map((brief) => new Date(brief.updated_at || brief.created_at).getTime())
-    .filter(Number.isFinite)
-    .sort((a, b) => b - a)[0];
-
-  if (!latest) return "No updates";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short"
-  }).format(new Date(latest));
-}
-
 export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
   const groups = Array.from(
     briefs.reduce((map, brief) => {
@@ -54,7 +40,7 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
           <p className="pixel-label">Desktop</p>
           <h1>Artist folders</h1>
           <p>
-            Open a folder to view that artist&apos;s campaigns. New briefs save back into the matching artist folder automatically.
+            Open an artist folder to see their campaigns. New briefs automatically save into the matching folder.
           </p>
         </div>
         <Link href="/new" className="pixel-button focus-ring desktop-new-button">
@@ -91,14 +77,16 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
                   </span>
                   <span className="folder-name folder-title-text">{artist}</span>
                   <span className="folder-count">
-                    {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"} · {draftCount} draft · {completedCount} done
+                    {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"}
+                    {" · "}
+                    {draftCount} draft
+                    {completedCount ? ` · ${completedCount} done` : ""}
                   </span>
-                  <span className="folder-project-text folder-preview">
-                    {projects.length ? projects.slice(0, 2).join(" / ") : "No project yet"}
-                  </span>
-                  <span className="folder-updated">
-                    {isCompletedFolder ? "completed" : `updated ${updatedLabel(artistBriefs)}`}
-                  </span>
+                  {projects.length ? (
+                    <span className="folder-project-text folder-preview">
+                      {projects.slice(0, 1).join(" / ")}
+                    </span>
+                  ) : null}
                 </Link>
                 <DeleteArtistFolderButton artist={artist} count={artistBriefs.length} />
               </div>
