@@ -884,6 +884,36 @@ function FunnelPreview({
   return <BriefFunnelView brief={previewBrief} />;
 }
 
+function BottomFunnelDrawer({
+  setup,
+  adSets,
+  ads,
+}: {
+  setup: CampaignSetup;
+  adSets: WizardAdSet[];
+  ads: WizardAd[];
+}) {
+  const terms = adSetUnit(setup.platform);
+
+  return (
+    <details className="bottom-funnel-drawer">
+      <summary>
+        <span className="bottom-funnel-copy">
+          <span className="pixel-label">Preview</span>
+          <strong>Expand live funnel</strong>
+          <small>Campaign → {terms.lowerPlural} → ads → destination.</small>
+        </span>
+        <span className="bottom-funnel-meta">
+          {adSets.length} {adSets.length === 1 ? terms.lower : terms.lowerPlural} · {ads.length} ad{ads.length === 1 ? "" : "s"}
+        </span>
+      </summary>
+      <div className="bottom-funnel-drawer-body">
+        <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
+      </div>
+    </details>
+  );
+}
+
 function SummaryStrip({
   setup,
   adSets,
@@ -1593,9 +1623,6 @@ function BuilderInsightPanel({
         <SourceEvidencePanel setup={setup} adSets={adSets} ads={ads} />
       </BuilderRailDrawer>
 
-      <BuilderRailDrawer eyebrow="Preview" title="Live funnel" meta={`${adSets.length}:${ads.length}`} className="live-funnel-drawer">
-        <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
-      </BuilderRailDrawer>
     </aside>
   );
 }
@@ -3136,6 +3163,10 @@ export function NewBriefForm({
           ) : null}
             </div>
           </div>
+
+          {slide === 11 ? null : (
+            <BottomFunnelDrawer setup={setup} adSets={adSets} ads={ads} />
+          )}
         </main>
 
         <BuilderInsightPanel
