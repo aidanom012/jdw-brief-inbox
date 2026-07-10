@@ -32,3 +32,13 @@ Optional fallback models can be supplied as a comma-separated list, but keep thi
 ```env
 GEMINI_FALLBACK_MODELS=
 ```
+
+## Token-saving backend behaviour
+
+The Gemini route is designed to call Gemini once per click. It asks for a compact extraction object, not the full app JSON. The backend then expands the compact extraction into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape locally.
+
+This keeps output tokens down and reduces invalid JSON issues because Gemini no longer has to generate boilerplate fields that the app can create itself.
+
+The route also sends a JSON schema to Gemini using `responseMimeType: "application/json"` and `responseJsonSchema`.
+
+If Gemini still returns malformed text, the backend tries local JSON extraction only. It does not spend another Gemini request trying to repair the same output.

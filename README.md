@@ -45,3 +45,29 @@ Optional fallback models can be supplied as a comma-separated list, but keep thi
 GEMINI_FALLBACK_MODELS=
 ```
 
+
+
+## Gemini brief parser
+
+The `/new` page includes a Gemini parser for pasting messy James-style notes into the brief builder. The API key is server-only and read from `GEMINI_API_KEY`; never expose it with `NEXT_PUBLIC_`.
+
+Current backend flow:
+
+1. Frontend sends only the raw pasted brief to `app/api/gemini/brief/route.ts`.
+2. Gemini returns a compact extraction object with `briefs[]`.
+3. `lib/gemini-brief.ts` converts that compact output into the full app schema locally.
+4. Existing Zod validation/checklist logic validates the generated brief.
+5. The UI loads the brief for review; it does not auto-save.
+
+This supports multiple campaign setups in one paste. Multiple generated briefs appear as selectable buttons in the UI.
+
+Environment variables:
+
+```env
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MAX_OUTPUT_TOKENS=4096
+GEMINI_FALLBACK_MODELS=
+```
+
+Leave `GEMINI_FALLBACK_MODELS` blank for normal use. Invalid JSON/validation errors do not trigger another model call.

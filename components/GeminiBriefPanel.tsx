@@ -15,6 +15,12 @@ type GeminiBriefPanelProps = {
   ) => void;
 };
 
+type GeminiTokenUsage = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+};
+
 type GeminiApiResult =
   | {
       ok: true;
@@ -23,6 +29,7 @@ type GeminiApiResult =
       briefCount: number;
       missingFields: string[];
       message: string;
+      tokenUsage?: GeminiTokenUsage | null;
     }
   | {
       ok: false;
@@ -59,6 +66,7 @@ export function GeminiBriefPanel({ onGenerated }: GeminiBriefPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [batchBriefs, setBatchBriefs] = useState<JDWCampaignBrief[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<GeminiTokenUsage | null>(null);
   const characterCount = rawBrief.trim().length;
 
   function loadBrief(brief: JDWCampaignBrief, message: string) {
@@ -73,6 +81,7 @@ export function GeminiBriefPanel({ onGenerated }: GeminiBriefPanelProps) {
     setError(null);
     setSuccess(null);
     setBatchBriefs([]);
+    setTokenUsage(null);
 
     if (!cleanBrief) {
       setError("Paste a raw brief first.");
@@ -99,6 +108,8 @@ export function GeminiBriefPanel({ onGenerated }: GeminiBriefPanelProps) {
             : [result.message, ...(result.issues || []).slice(0, 6)].join("\n")
         );
       }
+
+      setTokenUsage(result.tokenUsage || null);
 
       const validation = validateGeneratedPayload(result.generated);
       if (validation.briefs.length > 1) {
@@ -188,6 +199,11 @@ export function GeminiBriefPanel({ onGenerated }: GeminiBriefPanelProps) {
         {success ? (
           <p className="pixel-ready p-3 text-sm font-black" aria-live="polite">
             {success}
+            {tokenUsage?.totalTokenCount ? (
+              <span className="mt-1 block text-xs">
+                Gemini usage: {tokenUsage.promptTokenCount?.toLocaleString() || "?"} in / {tokenUsage.candidatesTokenCount?.toLocaleString() || "?"} out / {tokenUsage.totalTokenCount.toLocaleString()} total tokens
+              </span>
+            ) : null}
           </p>
         ) : null}
       </div>
