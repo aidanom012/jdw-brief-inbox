@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 export type UserRole = "aidan" | "james";
 
-const COOKIE_NAME = "jdw_brief_session";
+export const SESSION_COOKIE_NAME = "jdw_brief_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 const FULL_ACCESS_ROLE: UserRole = "aidan";
 export const LOCAL_DEV_PASSCODE = "local-jdw";
@@ -60,7 +60,7 @@ export function readSessionRole(value: string | undefined): UserRole | null {
 }
 
 export function getCurrentRole(): UserRole | null {
-  return readSessionRole(cookies().get(COOKIE_NAME)?.value);
+  return readSessionRole(cookies().get(SESSION_COOKIE_NAME)?.value);
 }
 
 export function requireUser(): UserRole {
@@ -77,7 +77,7 @@ export function requireAidan(): UserRole {
 }
 
 export function setSessionRole(role: UserRole = FULL_ACCESS_ROLE): void {
-  cookies().set(COOKIE_NAME, createSessionValue(role), {
+  cookies().set(SESSION_COOKIE_NAME, createSessionValue(role), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -88,7 +88,7 @@ export function setSessionRole(role: UserRole = FULL_ACCESS_ROLE): void {
 }
 
 export function clearSessionRole(): void {
-  cookies().set(COOKIE_NAME, "", {
+  cookies().set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

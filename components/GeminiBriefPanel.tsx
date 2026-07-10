@@ -84,6 +84,7 @@ export function GeminiBriefPanel({ onGenerated }: GeminiBriefPanelProps) {
     try {
       const response = await fetch("/api/gemini/brief", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json"
         },

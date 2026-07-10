@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCurrentRole } from "@/lib/auth";
+import { readSessionRole, SESSION_COOKIE_NAME } from "@/lib/auth";
 import {
   generateGeminiBrief,
   GeminiBriefError,
@@ -26,7 +26,7 @@ export function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const role = getCurrentRole();
+  const role = readSessionRole(request.cookies.get(SESSION_COOKIE_NAME)?.value);
   if (!role) {
     return jsonError("Log in before using the Gemini parser.", 401);
   }
