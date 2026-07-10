@@ -6,8 +6,8 @@ import {
   type JDWCampaignBrief
 } from "@/lib/brief-schema";
 
-const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
-const FALLBACK_GEMINI_MODELS = ["gemini-3.5-flash"];
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+const DEFAULT_RETRYABLE_STATUS_CODES = new Set([503]);
 const UNAVAILABLE_GEMINI_MODELS = new Set([
   "gemini-2.5-flash",
   "models/gemini-2.5-flash",
@@ -466,18 +466,29 @@ function isCredentialOrQuotaError(error: GeminiBriefError): boolean {
   );
 }
 
+function normaliseModelName(model: string): string {
+  return model.trim().replace(/^models\//, "");
+}
+
+function splitConfiguredFallbackModels(): string[] {
+  return (process.env.GEMINI_FALLBACK_MODELS || "")
+    .split(",")
+    .map((model) => model.trim())
+    .filter(Boolean);
+}
+
 function configuredModels(): string[] {
   const models = [
-    process.env.GEMINI_MODEL?.trim(),
+    process.env.GEMINI_MODEL,
     DEFAULT_GEMINI_MODEL,
-    ...FALLBACK_GEMINI_MODELS
-  ].filter((model): model is string => Boolean(model));
+    ...splitConfiguredFallbackModels()
+  ]
+    .filter((model): model is string => Boolean(model))
+    .map(normaliseModelName)
+    .filter((model) => !UNAVAILABLE_GEMINI_MODELS.has(model));
 
-  return Array.from(
-    new Set(
-      models.filter((model) => !UNAVAILABLE_GEMINI_MODELS.has(model))
-    )
-  );
+  const uniqueModels = Array.from(new Set(models));
+  return uniqueModels.length > 0 ? uniqueModels : [DEFAULT_GEMINI_MODEL];
 }
 
 function configuredMaxOutputTokens(): number {
@@ -509,32 +520,54 @@ async function readJsonResponse(response: Response): Promise<unknown> {
   }
 }
 
+function retryDelayMs(attemptIndex: number): number {
+  return 500 * Math.pow(2, attemptIndex);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function postGeminiJson(
   endpoint: string,
   apiKey: string,
-  body: unknown
+  body: unknown,
+  maxAttempts = 3
 ): Promise<{ response: Response; payload: unknown }> {
-  let response: Response;
+  let lastNetworkError: Error | null = null;
 
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify(body)
-    });
-  } catch (error) {
-    throw new GeminiBriefError("Gemini API was unreachable.", 502, [
-      error instanceof Error ? error.message : "Network request failed."
-    ]);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      const payload = await readJsonResponse(response);
+
+      if (
+        response.ok ||
+        attempt === maxAttempts - 1 ||
+        !DEFAULT_RETRYABLE_STATUS_CODES.has(response.status)
+      ) {
+        return { response, payload };
+      }
+    } catch (error) {
+      lastNetworkError = error instanceof Error ? error : new Error("Network request failed.");
+      if (attempt === maxAttempts - 1) {
+        break;
+      }
+    }
+
+    await sleep(retryDelayMs(attempt));
   }
 
-  return {
-    response,
-    payload: await readJsonResponse(response)
-  };
+  throw new GeminiBriefError("Gemini API was unreachable or temporarily overloaded.", 502, [
+    lastNetworkError?.message || "The model returned repeated temporary capacity errors."
+  ]);
 }
 
 async function generateWithGenerateContentApi(
@@ -569,7 +602,12 @@ async function generateWithGenerateContentApi(
   const { response, payload } = await postGeminiJson(endpoint, apiKey, body);
 
   if (!response.ok) {
-    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
+    const message =
+      response.status === 503
+        ? "Gemini is temporarily overloaded. Try the same brief again in a moment."
+        : "Gemini could not generate this brief.";
+
+    throw new GeminiBriefError(message, 502, [
       apiIssue("generateContent API", model, response, payload)
     ]);
   }

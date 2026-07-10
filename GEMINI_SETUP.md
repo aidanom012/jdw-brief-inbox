@@ -5,7 +5,7 @@
 
 ```env
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_MODEL=gemini-3.5-flash
 GEMINI_MAX_OUTPUT_TOKENS=4096
 ```
 
@@ -21,5 +21,14 @@ Project -> Settings -> Environment Variables
 
 The app calls Gemini only from `app/api/gemini/brief/route.ts`, asks for structured JSON, validates the generated JSON against the JDW schema, and loads it into the brief builder for review. It does not save Gemini output until the user clicks the normal save button.
 
+Use `GEMINI_MODEL=gemini-3.5-flash`. Only raise `GEMINI_MAX_OUTPUT_TOKENS` if large batch briefs are being cut off.
 
-For the lowest-cost setup, keep `GEMINI_MODEL=gemini-3.1-flash-lite`. Only raise `GEMINI_MAX_OUTPUT_TOKENS` if large batch briefs are being cut off.
+## 503 / high demand errors
+
+A 503 response means Gemini is temporarily overloaded or out of capacity. It is not the same as a bad key or a validation failure. The app retries short temporary 503 failures automatically, then shows a clear retry message if Gemini is still overloaded.
+
+Optional fallback models can be supplied as a comma-separated list, but keep this blank for normal use:
+
+```env
+GEMINI_FALLBACK_MODELS=
+```
