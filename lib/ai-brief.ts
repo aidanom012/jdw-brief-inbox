@@ -123,11 +123,12 @@ export class AiBriefError extends Error {
 }
 
 const AI_BRIEF_SYSTEM_PROMPT = `You extract paid-social campaign brief details from messy JDW / James Walker notes.
-Return only the JSON object required by the supplied JSON schema.
-Do not invent missing details. Use null for unknown scalar values and empty arrays for unknown lists.
+You are in JSON mode. Return one valid JSON object only. No markdown. No prose. No comments.
+Never output brief_version, source, build, missing_required_fields, or the full JDW app schema.
+Return only this compact object shape: {"briefs":[{"artist":"","release_title":"","platform":"","account":"","acid":"","asid":"","objective":"","campaign_type":"","conversion_location":"","optimisation_event":"","pixel":"","budget_type":"","budget_amount":"","currency":"","start_date":"","end_date":"","territory_summary":"","campaign_notes":"","ad_sets":[{"label":"","locations":[],"age_min":"","age_max":"","gender":"","placements":[],"budget_amount":"","budget_type":"","targeting_type":"","targeting_details":"","exclusions":"","notes":"","ads":[{"label":"","release_title":"","asset_type":"","asset_links":[],"post_url":"","boost_code":"","destination_url":"","copy":"","notes":""}]}],"ads":[],"special_notes":[]}]}
+Use empty strings for unknown scalar values and empty arrays for unknown lists. Keep output compact.
 Preserve exact supplied links, boost codes, ACID, ASID, budgets, dates, platforms, accounts, pixels, optimisation events, targeting, copy, and notes.
-If there are multiple distinct campaign setups, return one item per setup in briefs[].
-Keep the output compact. Do not output the full JDW app schema. Do not include markdown or prose.`;
+If there are multiple distinct campaign setups, return one item per setup in briefs[].`;
 
 function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
   return {
@@ -508,6 +509,13 @@ function configuredMaxCompletionTokens(): number {
   return Math.min(Math.floor(parsedValue), HARD_MAX_COMPLETION_TOKENS);
 }
 
+function groqResponseFormat(): JsonObject {
+  // Force JSON-object mode in code. Do not let old Vercel env vars put the app
+  // back into strict json_schema mode, because that was causing Groq 400
+  // failed_generation errors before the app received usable JSON.
+  return { type: "json_object" };
+}
+
 async function readJsonResponse(response: Response): Promise<unknown> {
   const raw = await response.text();
   if (!raw.trim()) return null;
@@ -568,23 +576,15 @@ async function generateWithGroq(rawBrief: string): Promise<{ generated: unknown;
         }
       ],
       max_completion_tokens: configuredMaxCompletionTokens(),
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "jdw_compact_brief_extraction",
-          strict: true,
-          schema: compactResponseJsonSchema
-        }
-      }
+      response_format: groqResponseFormat()
     })
   });
 
   const payload = await readJsonResponse(response);
 
   if (!response.ok) {
-    throw new AiBriefError("Groq could not generate this brief.", response.status >= 400 && response.status < 500 ? response.status : 502, [
-      apiIssue("Groq Chat Completions API", model, response, payload)
-    ]);
+    const issue = apiIssue("Groq Chat Completions API", model, response, payload);
+    throw new AiBriefError("Groq could not generate this brief.", response.status >= 400 && response.status < 500 ? response.status : 502, [issue]);
   }
 
   const typedPayload = payload as GroqChatCompletionResponse;

@@ -1,4 +1,4 @@
-# Groq strict JSON rebuild
+# Groq JSON object rebuild
 
 This build replaces the Gemini parser path with a Groq-first AI parser.
 
@@ -29,7 +29,7 @@ Do not use `NEXT_PUBLIC_GROQ_API_KEY`.
 - One AI call per click.
 - No AI repair calls.
 - Uses Groq's OpenAI-compatible Chat Completions endpoint.
-- Uses Structured Outputs with `response_format.type = "json_schema"` and `strict: true`.
+- Uses Groq JSON mode with `response_format.type = "json_object"`.
 - Asks Groq for a compact extraction object only.
 - Backend expands compact output into `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` locally.
 - Multiple briefs are still supported in one request.
@@ -39,3 +39,17 @@ Do not use `NEXT_PUBLIC_GROQ_API_KEY`.
 
 - `npm run typecheck` passed.
 - `npm run build` compiled and generated pages successfully.
+
+
+## Emergency JSON mode fix
+
+A Groq 400 `Failed to validate JSON` / `failed_generation` error means strict schema validation failed at Groq before the app received usable content. This build defaults to `` to avoid that failure path. The model now returns compact valid JSON and TypeScript expands/validates it locally.
+
+
+## 2026-07-10 Emergency cleanup
+
+- Removed the large /new top explainer/manual section.
+- Moved Back / Skip / Next controls above the AI helper so they belong to the manual builder flow.
+- Forced Groq JSON-object mode in code; old `GROQ_RESPONSE_FORMAT=json_schema` values are ignored.
+- Added final contrast overrides for funnel cards, dark selected cards, AI textarea, and form fields.
+- Kept Groq compact-output flow and no repair calls.

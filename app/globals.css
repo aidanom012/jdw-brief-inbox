@@ -3385,3 +3385,112 @@ button.flow-card:hover {
 .flow-chip {
   letter-spacing: 0 !important;
 }
+
+
+/* 2026-07-10 emergency /new page cleanup.
+   Keep manual builder primary, put controls before AI, and kill colour clashes. */
+.build-hero,
+.builder-command-center,
+.build-manual {
+  display: none !important;
+}
+
+.one-by-one-builder {
+  gap: 1.5rem !important;
+}
+
+.builder-workspace {
+  margin-bottom: 0 !important;
+}
+
+.wizard-controls {
+  position: static !important;
+  z-index: 5 !important;
+  margin: 1rem 0 1.5rem !important;
+  background: #ffffff !important;
+  color: #101216 !important;
+  border: 1px solid rgba(16,18,22,.12) !important;
+  box-shadow: var(--shadow-tight) !important;
+}
+
+.gemini-import-panel {
+  margin-top: 0 !important;
+  background: #ffffff !important;
+  color: #101216 !important;
+  border: 1px solid rgba(16,18,22,.14) !important;
+}
+
+.gemini-import-panel::after {
+  display: none !important;
+}
+
+.import-textarea,
+.field,
+textarea.field,
+select.field,
+input.field {
+  background: #ffffff !important;
+  color: #101216 !important;
+  border-color: rgba(16,18,22,.28) !important;
+}
+
+.import-textarea::placeholder,
+.field::placeholder {
+  color: rgba(16,18,22,.55) !important;
+}
+
+.flow-card {
+  background: #ffffff !important;
+  color: #101216 !important;
+  border-color: rgba(16,18,22,.16) !important;
+}
+
+.flow-card strong,
+.flow-card span,
+.flow-card small,
+.flow-eyebrow {
+  color: inherit !important;
+}
+
+.flow-card:not(.flow-card-active):not(.flow-campaign-card) small,
+.flow-card:not(.flow-card-active):not(.flow-campaign-card) .flow-eyebrow {
+  color: rgba(16,18,22,.62) !important;
+}
+
+.flow-campaign-card,
+.flow-card-active {
+  background: #101216 !important;
+  color: #ffffff !important;
+  border-color: #101216 !important;
+}
+
+.flow-campaign-card strong,
+.flow-campaign-card span,
+.flow-campaign-card small,
+.flow-campaign-card .flow-eyebrow,
+.flow-card-active strong,
+.flow-card-active span,
+.flow-card-active small,
+.flow-card-active .flow-eyebrow {
+  color: #ffffff !important;
+}
+
+.flow-campaign-card small,
+.flow-campaign-card .flow-eyebrow,
+.flow-card-active small,
+.flow-card-active .flow-eyebrow {
+  color: rgba(255,255,255,.78) !important;
+}
+
+.flow-destination-card,
+.flow-result-card,
+.flow-audience-card,
+.flow-ad-card {
+  background: #ffffff !important;
+}
+
+.pixel-alert {
+  background: #fff1f0 !important;
+  color: #9f1d26 !important;
+  border-color: rgba(159,29,38,.25) !important;
+}

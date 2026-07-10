@@ -1129,10 +1129,6 @@ export function NewBriefForm({
 
   return (
     <div className="one-by-one-builder">
-      <div className="builder-command-center">
-        <BuildManual />
-      </div>
-
       <div className="pixel-window p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -2050,14 +2046,6 @@ export function NewBriefForm({
         ) : null}
       </div>
 
-      {!briefId ? (
-        <AiBriefPanel
-          onGenerated={(json, validation, message) =>
-            applyValidatedJson(json, validation, message)
-          }
-        />
-      ) : null}
-
       <div className="wizard-controls pixel-window p-4">
         <button
           type="button"
@@ -2100,6 +2088,14 @@ export function NewBriefForm({
           </button>
         )}
       </div>
+
+      {!briefId ? (
+        <AiBriefPanel
+          onGenerated={(json, validation, message) =>
+            applyValidatedJson(json, validation, message)
+          }
+        />
+      ) : null}
     </div>
   );
 }

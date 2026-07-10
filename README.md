@@ -15,7 +15,7 @@ GROQ_MODEL=openai/gpt-oss-20b
 GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 
-The frontend sends only the pasted raw brief to `/api/ai/brief`. The backend calls Groq server-side using Structured Outputs with a strict JSON schema. Groq returns a compact extraction object, and the backend expands it locally into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape.
+The frontend sends only the pasted raw brief to `/api/ai/brief`. The backend calls Groq server-side using Groq JSON mode. Groq returns a compact extraction object, and the backend expands it locally into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape.
 
 The old `/api/gemini/brief` route remains only as a compatibility wrapper to `/api/ai/brief` so older UI calls do not break during deploys.
 
