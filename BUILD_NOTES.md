@@ -75,3 +75,20 @@ Checkpoint before this work:
 - `.env.example`
 - `GROQ_SETUP.md`
 - `README.md`
+
+## 2026-07-10 builder UI clarity refactor
+
+### Behaviour
+
+- Builder now has persistent Campaign / Ad Set or Ad Group / Ads / Review navigation.
+- Playbook guidance is still available, but collapsed by default inside an Advanced Guidance drawer.
+- Smart templates moved out of the main workflow and into an Advanced Tools drawer.
+- Right rail now keeps confidence and missing-info prompts visible, with source evidence and funnel preview collapsed by default.
+- Missing-info prompts show the first four checks up front, with extra checks behind a small drawer.
+- AI parser now sends stronger split hints to Groq and retries once with a split-focused instruction when multiple campaigns are suspected but only one is returned.
+
+### Files changed
+
+- `app/globals.css`
+- `components/NewBriefForm.tsx`
+- `lib/ai-brief.ts`

@@ -139,7 +139,10 @@ Never output brief_version, source, build, missing_required_fields, or the full 
 Return only this compact object shape: {"briefs":[{"artist":"","release_title":"","platform":"","account":"","acid":"","asid":"","objective":"","campaign_type":"","conversion_location":"","optimisation_event":"","pixel":"","budget_type":"","budget_amount":"","currency":"","start_date":"","end_date":"","territory_summary":"","campaign_notes":"","ad_sets":[{"label":"","locations":[],"age_min":"","age_max":"","gender":"","placements":[],"budget_amount":"","budget_type":"","targeting_type":"","targeting_details":"","exclusions":"","notes":"","ads":[{"label":"","release_title":"","asset_type":"","asset_links":[],"post_url":"","boost_code":"","destination_url":"","copy":"","notes":""}]}],"ads":[],"special_notes":[]}]}
 Use empty strings for unknown scalar values and empty arrays for unknown lists. Keep output compact.
 Preserve exact supplied links, boost codes, ACID, ASID, budgets, dates, platforms, accounts, pixels, optimisation events, targeting, copy, and notes.
-If there are multiple distinct campaign setups, return one item per setup in briefs[].`;
+If there are multiple distinct campaign setups, return one item per setup in briefs[].
+Split campaign setups when the note has explicit campaign headings, separate artists/releases, separate platforms, separate objectives, separate accounts, separate ACID/ASID values, separate territories, separate budgets, or separate flights.
+Do not merge a Meta setup and a TikTok setup. Do not merge separate budget/objective setups for the same artist. If values are shared across setups, copy those exact values into each relevant brief.
+Keep multiple ad sets/ad groups or multiple ads inside one campaign brief when they clearly belong to the same campaign setup.`;
 
 function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
   return {
@@ -357,13 +360,108 @@ function getFirstRegex(rawBrief: string, pattern: RegExp): string | null {
   return match?.[1]?.trim() || null;
 }
 
+function uniqueRegexMatches(rawBrief: string, pattern: RegExp, limit: number): string[] {
+  const values: string[] = [];
+  for (const match of rawBrief.matchAll(pattern)) {
+    const value = String(match[1] || match[0] || "").trim();
+    if (value) values.push(value);
+  }
+  return Array.from(new Set(values)).slice(0, limit);
+}
+
+function normalizePlatformMention(value: string): string {
+  const normalized = value.toLowerCase();
+  if (normalized.includes("tiktok")) return "TikTok";
+  if (normalized.includes("youtube")) return "YouTube";
+  if (normalized.includes("meta") || normalized.includes("facebook") || normalized.includes("instagram")) return "Meta";
+  return value.trim();
+}
+
+function campaignSplitHints(rawBrief: string) {
+  const lines = rawBrief
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const campaignHeadingLines = lines.filter((line) =>
+    /^(?:campaign|setup|brief)\s*(?:#|no\.?)?\s*(?:\d+|[a-z]|[-:])/i.test(line),
+  );
+  const numberedCampaignLines = lines.filter(
+    (line) =>
+      /^(?:\d+|[a-z])[\).:-]\s+/i.test(line) &&
+      /\b(campaign|setup|build|meta|facebook|instagram|tiktok|youtube|objective|budget|artist|release|traffic|views|spark|conversion|stream)\b/i.test(line),
+  );
+  const platformMentions = Array.from(
+    new Set(
+      uniqueRegexMatches(rawBrief, /\b(meta|facebook|instagram|tiktok|youtube)\b/gi, 30).map(
+        normalizePlatformMention,
+      ),
+    ),
+  );
+  const acidMentions = uniqueRegexMatches(rawBrief, /\bACID\s*[:#-]?\s*([A-Z0-9_-]{3,})/gi, 12);
+  const asidMentions = uniqueRegexMatches(rawBrief, /\bASID\s*[:#-]?\s*([A-Z0-9_-]{3,})/gi, 12);
+  const objectiveMentions = uniqueRegexMatches(
+    rawBrief,
+    /\b(streaming conversions?|sales|traffic|landing page views?|lpv|video views?|thruplay|awareness|engagement|followers|leads?|conversions?|spark|boost)\b/gi,
+    12,
+  );
+  const budgetMentions = uniqueRegexMatches(
+    rawBrief,
+    /([£€$]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:gbp|eur|usd|aud|cad)\b)/gi,
+    12,
+  );
+
+  const explicitSectionCount = Math.max(campaignHeadingLines.length, numberedCampaignLines.length);
+  let expectedCampaignSetups = 1;
+  const splitSignals: string[] = [];
+
+  if (explicitSectionCount > 1) {
+    expectedCampaignSetups = Math.max(expectedCampaignSetups, explicitSectionCount);
+    splitSignals.push(`${explicitSectionCount} explicit campaign sections`);
+  }
+  if (platformMentions.length > 1) {
+    expectedCampaignSetups = Math.max(expectedCampaignSetups, platformMentions.length);
+    splitSignals.push(`${platformMentions.length} platforms`);
+  }
+  if (acidMentions.length > 1) {
+    expectedCampaignSetups = Math.max(expectedCampaignSetups, acidMentions.length);
+    splitSignals.push(`${acidMentions.length} ACID values`);
+  }
+  if (asidMentions.length > 1) {
+    expectedCampaignSetups = Math.max(expectedCampaignSetups, asidMentions.length);
+    splitSignals.push(`${asidMentions.length} ASID values`);
+  }
+  if (objectiveMentions.length > 1 && budgetMentions.length > 1) {
+    expectedCampaignSetups = Math.max(expectedCampaignSetups, Math.min(objectiveMentions.length, budgetMentions.length));
+    splitSignals.push("multiple objective and budget pairs");
+  }
+
+  return {
+    expectedCampaignSetups: Math.min(expectedCampaignSetups, 8),
+    splitSignals,
+    campaignHeadingLines: campaignHeadingLines.slice(0, 10),
+    numberedCampaignLines: numberedCampaignLines.slice(0, 10),
+    platforms: platformMentions,
+    acidMentions,
+    asidMentions,
+    objectiveMentions,
+    budgetMentions
+  };
+}
+
 function localFacts(rawBrief: string) {
   const urls = Array.from(new Set(rawBrief.match(/https?:\/\/[^\s)\]>"']+/gi) || []));
   const boostCodes = Array.from(new Set(rawBrief.match(/#[A-Za-z0-9+/=_-]{20,}/g) || []));
   const acid = getFirstRegex(rawBrief, /\bACID\s*[:#-]?\s*([A-Z0-9_-]{3,})/i);
   const asid = getFirstRegex(rawBrief, /\bASID\s*[:#-]?\s*([A-Z0-9_-]{3,})/i);
   const budgetMatch = rawBrief.match(/[£€$]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:gbp|eur|usd|aud|cad)\b/i)?.[0] || null;
-  return { acid, asid, urls: urls.slice(0, 30), boostCodes: boostCodes.slice(0, 20), budgetHint: budgetMatch };
+  return {
+    acid,
+    asid,
+    urls: urls.slice(0, 30),
+    boostCodes: boostCodes.slice(0, 20),
+    budgetHint: budgetMatch,
+    splitHints: campaignSplitHints(rawBrief)
+  };
 }
 
 function compactAdToJdw(value: unknown): JDWCampaignBrief["ads"][number] {
@@ -482,6 +580,17 @@ function payloadToJdwPayload(value: unknown, rawBrief: string): unknown {
     : { brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1", briefs };
 }
 
+function generatedBriefCount(value: unknown): number {
+  if (Array.isArray(value)) return value.length;
+  if (!isJsonObject(value)) return 0;
+  if (value.brief_version === "JDW_CAMPAIGN_BRIEF_BATCH_V1" && Array.isArray(value.briefs)) {
+    return value.briefs.length;
+  }
+  if (value.brief_version === "JDW_CAMPAIGN_BRIEF_V1") return 1;
+  if (Array.isArray(value.briefs)) return value.briefs.length;
+  return 0;
+}
+
 function briefPayloadFromValidation(validation: Extract<BriefValidationResult, { ok: true }>): GeneratedBriefPayload {
   if (validation.isBatch) {
     return {
@@ -567,7 +676,13 @@ function shouldRetryWithoutGroqJsonMode(response: Response, payload: unknown): b
   return text.includes("failed_generation") || text.includes("validate json") || text.includes("json");
 }
 
-function groqRequestBody(model: string, rawBrief: string, facts: ReturnType<typeof localFacts>, useJsonMode: boolean): JsonObject {
+function groqRequestBody(
+  model: string,
+  rawBrief: string,
+  facts: ReturnType<typeof localFacts>,
+  useJsonMode: boolean,
+  extraInstruction?: string
+): JsonObject {
   return {
     model,
     temperature: 0,
@@ -575,7 +690,7 @@ function groqRequestBody(model: string, rawBrief: string, facts: ReturnType<type
       { role: "system", content: AI_BRIEF_SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Local deterministic hints, do not ignore exact matches:\n${JSON.stringify(facts)}\n\nRaw JDW brief:\n${rawBrief}`
+        content: `Local deterministic hints, do not ignore exact matches:\n${JSON.stringify(facts)}${extraInstruction ? `\n\nAdditional parser instruction:\n${extraInstruction}` : ""}\n\nRaw JDW brief:\n${rawBrief}`
       }
     ],
     max_completion_tokens: configuredMaxCompletionTokens(),
@@ -634,24 +749,24 @@ async function postGroqChatCompletion(apiKey: string, body: JsonObject): Promise
   };
 }
 
-async function generateWithGroqModel(rawBrief: string, model: string): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string; note: string }> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new AiBriefError("Groq is not configured for this app yet. Add GROQ_API_KEY in Vercel/env.", 500);
-  }
-
-  const facts = localFacts(rawBrief);
+async function requestGroqJson(
+  apiKey: string,
+  model: string,
+  rawBrief: string,
+  facts: ReturnType<typeof localFacts>,
+  extraInstruction?: string
+): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string; note: string }> {
   let retriedWithoutJsonMode = false;
   let { response, payload } = await postGroqChatCompletion(
     apiKey,
-    groqRequestBody(model, rawBrief, facts, true)
+    groqRequestBody(model, rawBrief, facts, true, extraInstruction)
   );
 
   if (!response.ok && shouldRetryWithoutGroqJsonMode(response, payload)) {
     retriedWithoutJsonMode = true;
     ({ response, payload } = await postGroqChatCompletion(
       apiKey,
-      groqRequestBody(model, rawBrief, facts, false)
+      groqRequestBody(model, rawBrief, facts, false, extraInstruction)
     ));
   }
 
@@ -682,6 +797,41 @@ async function generateWithGroqModel(rawBrief: string, model: string): Promise<{
       ? "Generated after retrying without Groq JSON mode."
       : "Generated with Groq JSON mode."
   };
+}
+
+async function generateWithGroqModel(rawBrief: string, model: string): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string; note: string }> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new AiBriefError("Groq is not configured for this app yet. Add GROQ_API_KEY in Vercel/env.", 500);
+  }
+
+  const facts = localFacts(rawBrief);
+  const firstResult = await requestGroqJson(apiKey, model, rawBrief, facts);
+  const expectedCampaigns = facts.splitHints.expectedCampaignSetups;
+  const firstCount = generatedBriefCount(firstResult.generated);
+
+  if (expectedCampaigns > 1 && firstCount > 0 && firstCount < expectedCampaigns) {
+    try {
+      const splitResult = await requestGroqJson(
+        apiKey,
+        model,
+        rawBrief,
+        facts,
+        `The deterministic hints indicate about ${expectedCampaigns} distinct campaign setups: ${facts.splitHints.splitSignals.join(", ") || "multiple campaign sections"}. Return separate briefs[] items for each distinct campaign setup unless the raw brief clearly says they are ad sets/ad groups inside the same campaign. Do not discard later campaigns.`
+      );
+      const splitCount = generatedBriefCount(splitResult.generated);
+      if (splitCount > firstCount) {
+        return {
+          ...splitResult,
+          note: `${splitResult.note} Split retry expanded ${firstCount} to ${splitCount} campaigns.`
+        };
+      }
+    } catch {
+      // Keep the first valid model output and let the existing validation/fallback path continue.
+    }
+  }
+
+  return firstResult;
 }
 
 function validateGeneratedBrief(

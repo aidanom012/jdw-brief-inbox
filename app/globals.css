@@ -3062,6 +3062,23 @@ h1, h2, h3, h4, h5, h6, p, span, button, label, summary, strong, small {
   font-size: .72rem;
   white-space: nowrap;
 }
+.missing-extra-drawer {
+  border: 1px dashed rgba(16,18,22,.18);
+  border-radius: 16px;
+  background: rgba(255,255,255,.62);
+  padding: .65rem;
+}
+.missing-extra-drawer > summary {
+  cursor: pointer;
+  list-style: none;
+  color: rgba(16,18,22,.68);
+  font-size: .76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+.missing-extra-drawer > summary::-webkit-details-marker {
+  display: none;
+}
 
 .flow-shell {
   overflow: hidden;
@@ -3614,6 +3631,50 @@ input.field {
   font-size: .85rem;
   font-weight: 900;
 }
+.advanced-guidance-drawer {
+  margin-bottom: 1rem;
+  border: 1px solid rgba(16,18,22,.12);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #101216;
+  padding: .25rem;
+}
+.advanced-guidance-drawer > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 10px;
+  padding: .8rem .9rem;
+}
+.advanced-guidance-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-guidance-drawer > summary strong {
+  display: block;
+  margin-top: .12rem;
+  font-size: .98rem;
+  font-weight: 950;
+}
+.advanced-guidance-drawer .playbook-guide {
+  margin: .35rem 0 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.drawer-meta {
+  flex: 0 0 auto;
+  border: 1px solid rgba(16,18,22,.14);
+  border-radius: 999px;
+  background: #f4f6f8;
+  color: rgba(16,18,22,.7);
+  padding: .35rem .55rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: .64rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
 .wizard-controls-inline {
   display: flex !important;
   justify-content: space-between !important;
@@ -3860,6 +3921,24 @@ input.field {
   margin-inline: auto;
   padding: 0 clamp(1rem, 2vw, 1.75rem) 6.5rem;
 }
+.builder-console .builder-mode-banner {
+  align-items: center;
+  border-radius: 14px;
+  padding: clamp(.85rem, 1.5vw, 1.15rem);
+  box-shadow: 0 12px 30px rgba(17,19,24,.08);
+}
+.builder-console .builder-mode-banner h1 {
+  margin-top: .2rem;
+  font-size: clamp(1.55rem, 2.6vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+.builder-console .builder-mode-banner p:not(.pixel-label) {
+  margin-top: .35rem;
+  max-width: 760px;
+  font-size: .86rem;
+  line-height: 1.38;
+}
 .builder-console-grid {
   display: grid;
   grid-template-columns: minmax(230px, 290px) minmax(0, 1fr) minmax(280px, 360px);
@@ -3884,7 +3963,7 @@ input.field {
 .builder-command-header {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: .75rem;
   align-items: start;
   border-radius: 12px;
   background:
@@ -3896,8 +3975,8 @@ input.field {
 }
 .builder-command-copy h2 {
   margin-top: .2rem;
-  font-size: clamp(2rem, 4vw, 4.4rem);
-  line-height: .9;
+  font-size: clamp(1.85rem, 3.2vw, 3.35rem);
+  line-height: .95;
   font-weight: 950;
 }
 .builder-command-copy p:last-child {
@@ -3913,6 +3992,69 @@ input.field {
   justify-content: flex-start;
   align-items: center;
   gap: .5rem;
+}
+.build-level-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem;
+}
+.build-level-tab {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: .58rem;
+  min-width: 0;
+  border: 1px solid rgba(17,19,24,.14);
+  border-radius: 10px;
+  background: rgba(255,255,255,.74);
+  color: var(--console-ink);
+  padding: .64rem;
+  text-align: left;
+}
+.build-level-tab:hover {
+  border-color: rgba(17,19,24,.3);
+  background: #ffffff;
+}
+.build-level-tab-active {
+  border-color: var(--console-ink);
+  background: var(--console-ink);
+  color: #ffffff;
+}
+.build-level-tab-missing:not(.build-level-tab-active) {
+  border-color: rgba(244,63,94,.28);
+  background: #fff7f8;
+}
+.build-level-step {
+  display: grid;
+  place-items: center;
+  min-width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  background: rgba(17,19,24,.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: .62rem;
+  font-weight: 950;
+}
+.build-level-tab-active .build-level-step {
+  background: #ffffff;
+  color: var(--console-ink);
+}
+.build-level-tab strong,
+.build-level-tab small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.build-level-tab strong {
+  font-size: .84rem;
+  font-weight: 950;
+}
+.build-level-tab small {
+  margin-top: .05rem;
+  font-size: .65rem;
+  font-weight: 850;
+  opacity: .7;
 }
 .builder-progress-track {
   grid-column: 1 / -1;
@@ -4061,6 +4203,42 @@ input.field {
   padding: .95rem;
   box-shadow: 0 12px 30px rgba(17,19,24,.07);
 }
+.builder-rail-drawer {
+  padding: .25rem;
+}
+.builder-rail-drawer > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .85rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 9px;
+  padding: .72rem;
+}
+.builder-rail-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+.builder-rail-drawer > summary strong {
+  display: block;
+  margin-top: .1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .94rem;
+  font-weight: 950;
+}
+.builder-rail-drawer[open] > summary {
+  background: #f7f8fb;
+}
+.builder-rail-drawer-body {
+  padding: .3rem .7rem .75rem;
+}
+.template-panel,
+.source-evidence-panel {
+  display: grid;
+  gap: .7rem;
+}
 .confidence-card p,
 .builder-empty-note {
   margin-top: .7rem;
@@ -4144,6 +4322,14 @@ input.field {
   padding-inline: .95rem;
 }
 .live-funnel-card .campaign-flow {
+  transform-origin: top left;
+}
+.live-funnel-drawer .builder-rail-drawer-body {
+  padding-inline: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+.live-funnel-drawer .campaign-flow {
   transform-origin: top left;
 }
 .funnel-loading {
@@ -4275,6 +4461,9 @@ input.field {
   .builder-step-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .build-level-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .builder-command-header {
     grid-template-columns: 1fr;
   }
@@ -4296,6 +4485,12 @@ input.field {
     flex: 1 1 auto;
   }
   .ai-pipeline {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .build-level-nav {
     grid-template-columns: 1fr;
   }
 }

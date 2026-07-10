@@ -204,6 +204,21 @@ const SLIDES = [
   { label: "Review", hint: "Save draft" },
 ] as const;
 
+type BuildLevelKey = "campaign" | "adSets" | "ads" | "review";
+
+const BUILD_LEVELS: Array<{
+  key: BuildLevelKey;
+  label: string;
+  slide: number;
+  stepRange: string;
+  hint: string;
+}> = [
+  { key: "campaign", label: "Campaign", slide: 0, stepRange: "01", hint: "Setup" },
+  { key: "adSets", label: "Ad sets", slide: 8, stepRange: "09", hint: "Audience" },
+  { key: "ads", label: "Ads", slide: 10, stepRange: "11", hint: "Creative" },
+  { key: "review", label: "Review", slide: 11, stepRange: "12", hint: "Save" },
+];
+
 type PlaybookGuide = {
   eyebrow: string;
   title: string;
@@ -237,6 +252,18 @@ function slideHintForPlatform(slide: number, platform: Platform): string {
   if (slide === 5 && isTikTokPlatform(platform)) return "Pixel/event if needed, or skip for Spark/video views.";
   if (slide === 5 && isMetaPlatform(platform)) return "Pixel/dataset, conversion location, and optimisation event.";
   return SLIDES[slide].hint;
+}
+
+function buildLevelForSlide(slide: number): BuildLevelKey {
+  if (slide >= 11) return "review";
+  if (slide >= 10) return "ads";
+  if (slide >= 8) return "adSets";
+  return "campaign";
+}
+
+function buildLevelLabel(level: BuildLevelKey, platform: Platform): string {
+  if (level === "adSets") return adSetUnit(platform).plural;
+  return BUILD_LEVELS.find((item) => item.key === level)?.label || "Campaign";
 }
 
 function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null {
@@ -968,6 +995,8 @@ function MissingInfoCoach({
   onEditField: (field: string) => void;
 }) {
   const uniqueQuestions = Array.from(new Set(missingFields));
+  const visibleQuestions = uniqueQuestions.slice(0, 4);
+  const extraQuestions = uniqueQuestions.slice(4);
 
   return (
     <section className={`missing-coach ${uniqueQuestions.length === 0 ? "missing-coach-ready" : ""}`}>
@@ -977,7 +1006,7 @@ function MissingInfoCoach({
       </div>
       {uniqueQuestions.length > 0 ? (
         <div className="mt-4 grid gap-2">
-          {uniqueQuestions.map((field) => (
+          {visibleQuestions.map((field) => (
             <button
               key={field}
               type="button"
@@ -988,6 +1017,24 @@ function MissingInfoCoach({
               <code>{field}</code>
             </button>
           ))}
+          {extraQuestions.length ? (
+            <details className="missing-extra-drawer">
+              <summary>Show {extraQuestions.length} more checks</summary>
+              <div className="mt-2 grid gap-2">
+                {extraQuestions.map((field) => (
+                  <button
+                    key={field}
+                    type="button"
+                    className="missing-question"
+                    onClick={() => onEditField(field)}
+                  >
+                    <span>{questionForMissingField(field)}</span>
+                    <code>{field}</code>
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       ) : (
         <p className="mt-3 text-sm font-semibold pixel-muted">
@@ -1110,6 +1157,21 @@ function PlaybookGuideCard({ guide }: { guide: PlaybookGuide }) {
         ))}
       </ul>
     </aside>
+  );
+}
+
+function AdvancedGuidanceDrawer({ guide }: { guide: PlaybookGuide }) {
+  return (
+    <details className="advanced-guidance-drawer">
+      <summary>
+        <span>
+          <span className="pixel-label">Advanced guidance</span>
+          <strong>Campaign strategy</strong>
+        </span>
+        <span className="drawer-meta">{guide.eyebrow}</span>
+      </summary>
+      <PlaybookGuideCard guide={guide} />
+    </details>
   );
 }
 
@@ -1309,6 +1371,46 @@ function BuilderStepRail({
   );
 }
 
+function BuildLevelNav({
+  slide,
+  setup,
+  missingFields,
+  onSelect,
+}: {
+  slide: number;
+  setup: CampaignSetup;
+  missingFields: string[];
+  onSelect: (slide: number) => void;
+}) {
+  const activeLevel = buildLevelForSlide(slide);
+
+  return (
+    <nav className="build-level-nav" aria-label="Campaign builder sections">
+      {BUILD_LEVELS.map((level) => {
+        const missingCount = missingFields.filter(
+          (field) => buildLevelForSlide(slideForMissingField(field)) === level.key,
+        ).length;
+        const isActive = level.key === activeLevel;
+        return (
+          <button
+            key={level.key}
+            type="button"
+            onClick={() => onSelect(level.slide)}
+            aria-current={isActive ? "step" : undefined}
+            className={`build-level-tab ${isActive ? "build-level-tab-active" : ""} ${missingCount ? "build-level-tab-missing" : ""}`}
+          >
+            <span className="build-level-step">{level.stepRange}</span>
+            <span>
+              <strong>{buildLevelLabel(level.key, setup.platform)}</strong>
+              <small>{missingCount ? `${missingCount} missing` : level.hint}</small>
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function QueueActionPanel({
   hasQueue,
   readyCount,
@@ -1354,6 +1456,38 @@ function QueueActionPanel({
   );
 }
 
+function BuilderRailDrawer({
+  eyebrow,
+  title,
+  meta,
+  children,
+  defaultOpen = false,
+  className = "",
+}: {
+  eyebrow: string;
+  title: string;
+  meta?: string | number;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  return (
+    <details
+      className={`builder-side-card builder-rail-drawer ${className}`}
+      {...(defaultOpen ? { open: true } : {})}
+    >
+      <summary>
+        <span>
+          <span className="pixel-label">{eyebrow}</span>
+          <strong>{title}</strong>
+        </span>
+        {meta !== undefined ? <span className="drawer-meta">{meta}</span> : null}
+      </summary>
+      <div className="builder-rail-drawer-body">{children}</div>
+    </details>
+  );
+}
+
 function CampaignTemplatePanel({
   setup,
   onApplyTemplate,
@@ -1364,7 +1498,7 @@ function CampaignTemplatePanel({
   const activePlatform = setup.platform || "Meta";
 
   return (
-    <section className="builder-side-card">
+    <div className="template-panel">
       <div className="builder-side-card-heading">
         <p className="pixel-label">Smart templates</p>
         <span>{activePlatform}</span>
@@ -1383,7 +1517,7 @@ function CampaignTemplatePanel({
           <span>Boost code ready</span>
         </button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -1399,7 +1533,7 @@ function SourceEvidencePanel({
   const rows = sourceEvidenceRows(setup, adSets, ads);
 
   return (
-    <section className="builder-side-card">
+    <div className="source-evidence-panel">
       <div className="builder-side-card-heading">
         <p className="pixel-label">Captured evidence</p>
         <span>{rows.length}</span>
@@ -1416,7 +1550,7 @@ function SourceEvidencePanel({
       ) : (
         <p className="builder-empty-note">The right signals will appear as the brief fills in.</p>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -1436,6 +1570,7 @@ function BuilderInsightPanel({
   onApplyTemplate: (template: CampaignTemplateId) => void;
 }) {
   const score = completionScore(missingFields);
+  const evidenceCount = sourceEvidenceRows(setup, adSets, ads).length;
 
   return (
     <aside className="builder-right-rail">
@@ -1450,19 +1585,19 @@ function BuilderInsightPanel({
         <p>{missingFields.length ? `${missingFields.length} items still need a decision.` : "Ready to save."}</p>
       </section>
 
-      <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
-
       <MissingInfoCoach missingFields={missingFields} onEditField={onEditMissing} />
 
-      <SourceEvidencePanel setup={setup} adSets={adSets} ads={ads} />
+      <BuilderRailDrawer eyebrow="Advanced tools" title="Smart templates" meta={setup.platform || "Tools"}>
+        <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
+      </BuilderRailDrawer>
 
-      <section className="builder-side-card live-funnel-card">
-        <div className="builder-side-card-heading">
-          <p className="pixel-label">Live funnel</p>
-          <span>{adSets.length}:{ads.length}</span>
-        </div>
+      <BuilderRailDrawer eyebrow="Source notes" title="Captured evidence" meta={evidenceCount}>
+        <SourceEvidencePanel setup={setup} adSets={adSets} ads={ads} />
+      </BuilderRailDrawer>
+
+      <BuilderRailDrawer eyebrow="Preview" title="Live funnel" meta={`${adSets.length}:${ads.length}`} className="live-funnel-drawer">
         <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
-      </section>
+      </BuilderRailDrawer>
     </aside>
   );
 }
@@ -1528,7 +1663,6 @@ export function NewBriefForm({
   );
   const [slide, setSlide] = useState(0);
   const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief ? "manual" : "choice");
-  const [infoOpen, setInfoOpen] = useState(false);
   const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
   const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
   const [ads, setAds] = useState<WizardAd[]>(initialState.ads);
@@ -2034,7 +2168,6 @@ export function NewBriefForm({
   function backToStartChoice() {
     persistActiveQueueDraft();
     setBuildMode("choice");
-    setInfoOpen(false);
     setSubmitError(null);
   }
 
@@ -2125,6 +2258,19 @@ export function NewBriefForm({
               <h2>{currentSlideLabel}</h2>
               <p>{currentSlideHint}</p>
             </div>
+            <div className="builder-progress-track">
+              <span style={{ width: `${((slide + 1) / SLIDES.length) * 100}%` }} />
+            </div>
+            <BuildLevelNav
+              slide={slide}
+              setup={setup}
+              missingFields={missingFields}
+              onSelect={(index) => {
+                persistActiveQueueDraft(index);
+                setSlide(index);
+                scrollBuilderToTop();
+              }}
+            />
             <div className="builder-command-meta">
               {autosaveMessage ? <span className="autosave-chip">{autosaveMessage}</span> : null}
               {!briefId ? (
@@ -2132,16 +2278,12 @@ export function NewBriefForm({
                   Clear autosave
                 </button>
               ) : null}
-              <SummaryStrip setup={setup} adSets={adSets} ads={ads} />
-            </div>
-            <div className="builder-progress-track">
-              <span style={{ width: `${((slide + 1) / SLIDES.length) * 100}%` }} />
             </div>
           </section>
 
           <div className="builder-workspace builder-workspace-console">
             <div key={slide} className="swipe-card builder-question-card pixel-window p-5 sm:p-8">
-          {currentPlaybookGuide ? <PlaybookGuideCard guide={currentPlaybookGuide} /> : null}
+          {currentPlaybookGuide ? <AdvancedGuidanceDrawer guide={currentPlaybookGuide} /> : null}
           {slide === 0 ? (
             <section className="simple-question">
               <p className="pixel-label">Artist folder</p>
