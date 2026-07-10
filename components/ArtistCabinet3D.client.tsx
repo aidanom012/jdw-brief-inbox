@@ -5,7 +5,7 @@ import { Html } from "@react-three/drei";
 import { useRouter } from "next/navigation";
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
-import { CabinetDrawer, type CabinetArtist } from "@/components/CabinetDrawer";
+import { DesktopFolder3D, type CabinetArtist } from "@/components/CabinetDrawer";
 
 type ArtistCabinet3DProps = {
   artists: CabinetArtist[];
@@ -24,90 +24,104 @@ function canUseWebGL(): boolean {
   }
 }
 
-function CabinetRig({ children }: { children: ReactNode }) {
+function DesktopRig({ children }: { children: ReactNode }) {
   const rigRef = useRef<THREE.Group>(null);
 
   useFrame(({ pointer }) => {
     if (!rigRef.current) return;
-    rigRef.current.rotation.y = THREE.MathUtils.lerp(rigRef.current.rotation.y, pointer.x * 0.08, 0.05);
-    rigRef.current.rotation.x = THREE.MathUtils.lerp(rigRef.current.rotation.x, -0.04 + pointer.y * 0.035, 0.05);
+    rigRef.current.rotation.y = THREE.MathUtils.lerp(rigRef.current.rotation.y, pointer.x * 0.045, 0.045);
+    rigRef.current.rotation.x = THREE.MathUtils.lerp(rigRef.current.rotation.x, -0.055 + pointer.y * 0.025, 0.045);
   });
 
   return <group ref={rigRef}>{children}</group>;
 }
 
-function CabinetScene({ artists, onOpen }: { artists: CabinetArtist[]; onOpen: (href: string) => void }) {
-  const visibleArtists = artists.slice(0, 10);
-  const columns = visibleArtists.length <= 3 ? 1 : 2;
-  const rows = Math.max(1, Math.ceil(visibleArtists.length / columns));
-  const drawerWidth = columns === 1 ? 3.9 : 2.42;
-  const totalWidth = columns * drawerWidth + (columns - 1) * 0.18 + 0.58;
-  const totalHeight = rows * 0.72 + (rows - 1) * 0.22 + 0.72;
-  const bodyDepth = 0.72;
+function DesktopScreenScene({ artists, onOpen }: { artists: CabinetArtist[]; onOpen: (href: string) => void }) {
+  const visibleArtists = artists.slice(0, 12);
+  const columns = visibleArtists.length <= 4 ? visibleArtists.length : 4;
+  const rows = Math.max(1, Math.ceil(visibleArtists.length / Math.max(1, columns)));
+  const screenWidth = 8.6;
+  const screenHeight = rows > 2 ? 4.9 : 4.25;
+  const screenY = rows > 2 ? 0.1 : 0;
 
   return (
     <>
-      <color attach="background" args={["#f7f8fb"]} />
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[2.8, 5.2, 4.6]} intensity={1.1} castShadow />
-      <directionalLight position={[-3.5, 2.2, 2.2]} intensity={0.38} />
-      <spotLight position={[0, 4.8, 4.4]} angle={0.42} penumbra={0.55} intensity={0.7} />
+      <color attach="background" args={["#eff3f9"]} />
+      <ambientLight intensity={0.78} />
+      <directionalLight position={[3.6, 5.4, 4.2]} intensity={1.05} castShadow />
+      <directionalLight position={[-4.5, 2.2, 2.8]} intensity={0.42} />
+      <spotLight position={[0, 5.4, 4.8]} angle={0.5} penumbra={0.55} intensity={0.72} />
 
-      <CabinetRig>
-        <group position={[0, 0, 0]}>
-          <mesh position={[0, 0, -bodyDepth / 2]} castShadow receiveShadow>
-            <boxGeometry args={[totalWidth, totalHeight, bodyDepth]} />
+      <DesktopRig>
+        <group position={[0, screenY, 0]}>
+          <mesh position={[0, 0, -0.42]} castShadow receiveShadow>
+            <boxGeometry args={[screenWidth + 0.36, screenHeight + 0.36, 0.34]} />
             <meshStandardMaterial color="#08090a" roughness={0.62} metalness={0.08} />
           </mesh>
 
-          <mesh position={[0, totalHeight / 2 + 0.12, -bodyDepth / 2]} castShadow receiveShadow>
-            <boxGeometry args={[totalWidth + 0.18, 0.18, bodyDepth + 0.12]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.74} metalness={0.04} />
+          <mesh position={[0, 0, -0.2]} receiveShadow>
+            <boxGeometry args={[screenWidth, screenHeight, 0.12]} />
+            <meshStandardMaterial color="#f7f9fc" roughness={0.78} metalness={0.02} />
           </mesh>
 
-          <mesh position={[0, -totalHeight / 2 - 0.11, -bodyDepth / 2]} castShadow receiveShadow>
-            <boxGeometry args={[totalWidth + 0.28, 0.22, bodyDepth + 0.18]} />
-            <meshStandardMaterial color="#08090a" roughness={0.62} metalness={0.1} />
+          <mesh position={[0, screenHeight / 2 - 0.27, -0.08]} receiveShadow>
+            <boxGeometry args={[screenWidth - 0.28, 0.36, 0.08]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.7} metalness={0.02} />
           </mesh>
 
-          <mesh position={[-totalWidth / 2 - 0.07, 0, -bodyDepth / 2]} castShadow receiveShadow>
-            <boxGeometry args={[0.14, totalHeight + 0.26, bodyDepth + 0.1]} />
-            <meshStandardMaterial color="#08090a" roughness={0.62} metalness={0.1} />
+          <mesh position={[0, -screenHeight / 2 + 0.3, -0.075]} receiveShadow>
+            <boxGeometry args={[screenWidth - 0.28, 0.34, 0.08]} />
+            <meshStandardMaterial color="#08090a" roughness={0.6} metalness={0.1} />
           </mesh>
-          <mesh position={[totalWidth / 2 + 0.07, 0, -bodyDepth / 2]} castShadow receiveShadow>
-            <boxGeometry args={[0.14, totalHeight + 0.26, bodyDepth + 0.1]} />
-            <meshStandardMaterial color="#08090a" roughness={0.62} metalness={0.1} />
+
+          <mesh position={[-screenWidth / 2 + 0.55, screenHeight / 2 - 0.27, 0.03]} castShadow>
+            <boxGeometry args={[0.18, 0.18, 0.07]} />
+            <meshStandardMaterial color="#eb5160" roughness={0.55} metalness={0.05} />
+          </mesh>
+          <mesh position={[-screenWidth / 2 + 0.85, screenHeight / 2 - 0.27, 0.03]} castShadow>
+            <boxGeometry args={[0.18, 0.18, 0.07]} />
+            <meshStandardMaterial color="#ffd073" roughness={0.55} metalness={0.05} />
+          </mesh>
+          <mesh position={[-screenWidth / 2 + 1.15, screenHeight / 2 - 0.27, 0.03]} castShadow>
+            <boxGeometry args={[0.18, 0.18, 0.07]} />
+            <meshStandardMaterial color="#57c785" roughness={0.55} metalness={0.05} />
           </mesh>
 
           {visibleArtists.map((artist, index) => (
-            <CabinetDrawer
+            <DesktopFolder3D
               key={artist.name}
               artist={artist}
               index={index}
-              columns={columns}
+              columns={columns || 1}
               rows={rows}
               onOpen={onOpen}
             />
           ))}
 
-          <Html position={[0, -totalHeight / 2 - 0.52, 0.2]} center distanceFactor={9} zIndexRange={[10, 0]}>
-            <div className="cabinet-caption">
-              Hover a drawer · click to open artist folder
-              {artists.length > visibleArtists.length ? ` · ${artists.length - visibleArtists.length} more below` : ""}
+          <Html position={[0, screenHeight / 2 - 0.28, 0.13]} center distanceFactor={7.6} zIndexRange={[15, 0]}>
+            <div className="desktop-3d-titlebar-label">
+              JDW desktop · artist folders · click a folder to open
+            </div>
+          </Html>
+
+          <Html position={[0, -screenHeight / 2 + 0.3, 0.13]} center distanceFactor={7.9} zIndexRange={[15, 0]}>
+            <div className="desktop-3d-taskbar-label">
+              {visibleArtists.length} visible folder{visibleArtists.length === 1 ? "" : "s"}
+              {artists.length > visibleArtists.length ? ` · ${artists.length - visibleArtists.length} more in the grid below` : ""}
             </div>
           </Html>
         </group>
-      </CabinetRig>
+      </DesktopRig>
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -totalHeight / 2 - 0.28, -0.15]} receiveShadow>
-        <planeGeometry args={[9, 4.2]} />
-        <shadowMaterial opacity={0.14} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2.72, -0.28]} receiveShadow>
+        <planeGeometry args={[10.8, 4.6]} />
+        <shadowMaterial opacity={0.12} />
       </mesh>
     </>
   );
 }
 
-class CabinetErrorBoundary extends Component<{ children: ReactNode; onFail: () => void }, { hasError: boolean }> {
+class Desktop3DErrorBoundary extends Component<{ children: ReactNode; onFail: () => void }, { hasError: boolean }> {
   state = { hasError: false };
 
   static getDerivedStateFromError() {
@@ -130,8 +144,9 @@ export default function ArtistCabinet3D({ artists }: ArtistCabinet3DProps) {
   const [failed, setFailed] = useState(false);
 
   const cameraPosition = useMemo<[number, number, number]>(() => {
-    const rows = Math.max(1, Math.ceil(Math.min(artists.length, 10) / (artists.length <= 3 ? 1 : 2)));
-    return [0, rows > 4 ? 1.15 : 0.85, rows > 4 ? 7.3 : 6.4];
+    const visibleCount = Math.min(artists.length, 12);
+    const rows = Math.max(1, Math.ceil(visibleCount / (visibleCount <= 4 ? Math.max(1, visibleCount) : 4)));
+    return [0, rows > 2 ? 0.5 : 0.25, rows > 2 ? 8.6 : 7.4];
   }, [artists.length]);
 
   useEffect(() => {
@@ -141,26 +156,34 @@ export default function ArtistCabinet3D({ artists }: ArtistCabinet3DProps) {
   if (artists.length === 0 || failed || !webglReady) return null;
 
   return (
-    <section className="artist-cabinet-panel" aria-label="3D artist filing cabinet preview">
-      <div className="artist-cabinet-copy">
-        <p className="pixel-label">3D desk preview</p>
-        <h2>Filing cabinet mode.</h2>
-        <p>The normal folder grid stays below. This is just the fun drawer view on desktop.</p>
+    <section className="artist-cabinet-panel desktop-3d-panel" aria-label="3D desktop artist folder preview">
+      <div className="desktop-3d-intro">
+        <div>
+          <p className="pixel-label">Desktop view</p>
+          <h2>Open artist folders fast.</h2>
+          <p>Clean 3D folder shortcuts with the key campaign info visible. The full 2D grid stays underneath as the fallback.</p>
+        </div>
+        <div className="desktop-3d-stats" aria-hidden="true">
+          <span>{artists.length} artists</span>
+          <span>{artists.reduce((total, artist) => total + artist.briefCount, 0)} briefs</span>
+          <span>{artists.reduce((total, artist) => total + artist.draftCount, 0)} drafts</span>
+        </div>
       </div>
-      <div className="artist-cabinet-frame">
-        <CabinetErrorBoundary onFail={() => setFailed(true)}>
+
+      <div className="artist-cabinet-frame desktop-3d-frame">
+        <Desktop3DErrorBoundary onFail={() => setFailed(true)}>
           <Canvas
-          shadows
-          dpr={[1, 1.6]}
-          camera={{ position: cameraPosition, fov: 38 }}
-          gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-          onCreated={({ gl }) => {
-            gl.setClearColor("#f7f8fb", 1);
-          }}
-        >
-          <CabinetScene artists={artists} onOpen={(href) => router.push(href)} />
+            shadows
+            dpr={[1, 1.5]}
+            camera={{ position: cameraPosition, fov: 40 }}
+            gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+            onCreated={({ gl }) => {
+              gl.setClearColor("#eff3f9", 1);
+            }}
+          >
+            <DesktopScreenScene artists={artists} onOpen={(href) => router.push(href)} />
           </Canvas>
-        </CabinetErrorBoundary>
+        </Desktop3DErrorBoundary>
       </div>
     </section>
   );

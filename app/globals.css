@@ -5104,3 +5104,192 @@ main:has(.builder-console) {
     display: none !important;
   }
 }
+
+/* R3F desktop folder view: clearer than the filing cabinet, still safe because the 2D grid remains below. */
+.desktop-3d-panel.artist-cabinet-panel {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 1rem !important;
+  margin: -1.2rem 0 clamp(3.2rem, 5vw, 5rem) !important;
+  padding: clamp(1rem, 2.2vw, 1.35rem) !important;
+  border: 2px solid rgba(8,9,10,.12) !important;
+  border-radius: 30px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(246,248,252,.96)),
+    radial-gradient(circle at 16% 10%, rgba(255,255,255,1), transparent 34%) !important;
+  box-shadow: 0 30px 90px rgba(8,9,10,.13), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.desktop-3d-intro {
+  display: flex !important;
+  align-items: end !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  padding: .2rem .2rem .35rem !important;
+}
+
+.desktop-3d-intro h2 {
+  margin-top: .25rem !important;
+  font-size: clamp(2rem, 4vw, 4rem) !important;
+  font-weight: 950 !important;
+  line-height: .88 !important;
+  letter-spacing: -.065em !important;
+  color: #08090a !important;
+}
+
+.desktop-3d-intro p:not(.pixel-label) {
+  margin-top: .8rem !important;
+  max-width: 620px !important;
+  color: rgba(8,9,10,.66) !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+  line-height: 1.5 !important;
+}
+
+.desktop-3d-stats {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: .5rem !important;
+}
+
+.desktop-3d-stats span {
+  border: 2px solid #08090a !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  padding: .56rem .75rem !important;
+  color: #08090a !important;
+  box-shadow: 0 12px 28px rgba(8,9,10,.1) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .68rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+.desktop-3d-frame.artist-cabinet-frame {
+  height: clamp(430px, 42vw, 650px) !important;
+  min-height: 430px !important;
+  border: 3px solid #08090a !important;
+  border-radius: 30px !important;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255,255,255,.95), rgba(239,243,249,.9) 54%, rgba(227,233,242,.98)),
+    linear-gradient(180deg, #f7f9fc, #e6ebf4) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.95),
+    inset 0 -34px 80px rgba(8,9,10,.09),
+    0 24px 70px rgba(8,9,10,.16) !important;
+}
+
+.desktop-3d-frame.artist-cabinet-frame::before {
+  background:
+    linear-gradient(rgba(8,9,10,.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(8,9,10,.026) 1px, transparent 1px) !important;
+  background-size: 26px 26px !important;
+  mask-image: radial-gradient(circle at 50% 45%, transparent 20%, black 82%) !important;
+}
+
+.desktop-3d-titlebar-label,
+.desktop-3d-taskbar-label {
+  border: 2px solid rgba(8,9,10,.14) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.92) !important;
+  color: rgba(8,9,10,.7) !important;
+  padding: .46rem .7rem !important;
+  white-space: nowrap !important;
+  box-shadow: 0 10px 22px rgba(8,9,10,.1) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .58rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .075em !important;
+  text-transform: uppercase !important;
+}
+
+.desktop-3d-taskbar-label {
+  background: rgba(8,9,10,.9) !important;
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+
+.desktop-folder-3d-label {
+  display: grid !important;
+  min-width: 174px !important;
+  max-width: 214px !important;
+  gap: .18rem !important;
+  border: 2px solid #08090a !important;
+  border-radius: 16px !important;
+  background: rgba(255,255,255,.96) !important;
+  color: #08090a !important;
+  padding: .52rem .62rem .56rem !important;
+  text-align: left !important;
+  box-shadow: 0 14px 28px rgba(8,9,10,.16) !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  transform: translateZ(0) !important;
+}
+
+.desktop-folder-3d-label:hover {
+  border-color: var(--accent) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+}
+
+.desktop-folder-3d-open {
+  display: inline-flex !important;
+  width: fit-content !important;
+  border-radius: 999px !important;
+  background: #08090a !important;
+  color: #ffffff !important;
+  padding: .2rem .38rem !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .48rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+
+.desktop-folder-3d-label:hover .desktop-folder-3d-open {
+  background: var(--accent) !important;
+}
+
+.desktop-folder-3d-name {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: .88rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -.035em !important;
+}
+
+.desktop-folder-3d-meta,
+.desktop-folder-3d-project {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: rgba(8,9,10,.58) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .52rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .055em !important;
+  text-transform: uppercase !important;
+}
+
+.desktop-folder-3d-project {
+  color: rgba(8,9,10,.76) !important;
+}
+
+@media (max-width: 1100px) {
+  .desktop-3d-intro {
+    align-items: start !important;
+    flex-direction: column !important;
+  }
+
+  .desktop-3d-stats {
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .desktop-3d-panel.artist-cabinet-panel {
+    display: none !important;
+  }
+}
