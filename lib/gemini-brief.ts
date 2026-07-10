@@ -6,9 +6,18 @@ import {
   type JDWCampaignBrief
 } from "@/lib/brief-schema";
 
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-const FALLBACK_GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
-const MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
+const FALLBACK_GEMINI_MODELS = ["gemini-3.5-flash"];
+const UNAVAILABLE_GEMINI_MODELS = new Set([
+  "gemini-2.5-flash",
+  "models/gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "models/gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+  "models/gemini-2.0-flash-lite"
+]);
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+const HARD_MAX_OUTPUT_TOKENS = 12000;
 export const MAX_RAW_GEMINI_BRIEF_LENGTH = 50_000;
 
 type GeminiGenerateContentResponse = {
@@ -458,13 +467,31 @@ function isCredentialOrQuotaError(error: GeminiBriefError): boolean {
 }
 
 function configuredModels(): string[] {
+  const models = [
+    process.env.GEMINI_MODEL?.trim(),
+    DEFAULT_GEMINI_MODEL,
+    ...FALLBACK_GEMINI_MODELS
+  ].filter((model): model is string => Boolean(model));
+
   return Array.from(
     new Set(
-      [process.env.GEMINI_MODEL?.trim(), DEFAULT_GEMINI_MODEL, ...FALLBACK_GEMINI_MODELS].filter(
-        (model): model is string => Boolean(model)
-      )
+      models.filter((model) => !UNAVAILABLE_GEMINI_MODELS.has(model))
     )
   );
+}
+
+function configuredMaxOutputTokens(): number {
+  const rawValue = process.env.GEMINI_MAX_OUTPUT_TOKENS?.trim();
+  if (!rawValue) {
+    return DEFAULT_MAX_OUTPUT_TOKENS;
+  }
+
+  const parsedValue = Number(rawValue);
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return DEFAULT_MAX_OUTPUT_TOKENS;
+  }
+
+  return Math.min(Math.floor(parsedValue), HARD_MAX_OUTPUT_TOKENS);
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -510,42 +537,6 @@ async function postGeminiJson(
   };
 }
 
-async function generateWithInteractionsApi(
-  apiKey: string,
-  model: string,
-  rawBrief: string
-): Promise<unknown> {
-  const { response, payload } = await postGeminiJson(
-    "https://generativelanguage.googleapis.com/v1beta/interactions",
-    apiKey,
-    {
-      model,
-      input: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`,
-      store: false,
-      generation_config: {
-        temperature: 0.1,
-        top_p: 0.8,
-        candidate_count: 1,
-        max_output_tokens: MAX_OUTPUT_TOKENS,
-        thinking_level: "low"
-      },
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: briefResponseJsonSchema
-      }
-    }
-  );
-
-  if (!response.ok) {
-    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
-      apiIssue("Interactions API", model, response, payload)
-    ]);
-  }
-
-  return parseJsonOnly(extractGeneratedJsonText(payload));
-}
-
 async function generateWithGenerateContentApi(
   apiKey: string,
   model: string,
@@ -570,7 +561,7 @@ async function generateWithGenerateContentApi(
       temperature: 0.1,
       topP: 0.8,
       candidateCount: 1,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxOutputTokens: configuredMaxOutputTokens(),
       responseMimeType: "application/json"
     }
   };
@@ -611,21 +602,6 @@ export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBrief
   }
 
   let lastError: GeminiBriefError | null = null;
-
-  for (const model of configuredModels()) {
-    try {
-      return validateGeneratedBrief(await generateWithInteractionsApi(apiKey, model, rawBrief));
-    } catch (error) {
-      if (!(error instanceof GeminiBriefError)) {
-        throw error;
-      }
-
-      lastError = error;
-      if (isCredentialOrQuotaError(error)) {
-        throw error;
-      }
-    }
-  }
 
   for (const model of configuredModels()) {
     try {
