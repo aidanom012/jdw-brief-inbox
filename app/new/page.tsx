@@ -2,6 +2,7 @@ import { NewBriefForm } from "@/components/NewBriefForm";
 import { TopBar } from "@/components/TopBar";
 import { getBriefs } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +12,21 @@ function unique(values: Array<string | null | undefined>): string[] {
 
 export default async function NewBriefPage() {
   const role = requireUser();
-  const briefs = await getBriefs();
+  const briefs = isSupabaseConfigured() ? await getBriefs() : [];
   const savedArtists = unique(briefs.map((brief) => brief.artist));
   const savedProjects = unique(briefs.map((brief) => brief.release_title));
 
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6">
-        <div className="mb-6 animate-rise text-center">
-          <p className="pixel-label">New manual brief</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight">One question at a time.</h1>
-          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 pixel-muted">
-            Artist → project → platform → setup → ad sets → ads. Use Skip whenever James has not said something.
+      <main className="mx-auto w-full max-w-[1320px] px-4 py-8 sm:px-6">
+        <div className="build-hero mb-6 animate-rise">
+          <p className="pixel-label">JDW build studio</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+            AI import first. Human review before save.
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 pixel-muted">
+            Paste James&apos; rough brief, let Gemini structure it, answer anything missing, then fine tune campaign setup, ad sets, ads, and links manually.
           </p>
         </div>
         <NewBriefForm savedArtists={savedArtists} savedProjects={savedProjects} />

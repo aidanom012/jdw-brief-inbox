@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BriefCard } from "@/components/BriefCard";
+import { ArtistDesktop } from "@/components/ArtistDesktop";
+import { BriefSearchList } from "@/components/BriefSearchList";
 import { TopBar } from "@/components/TopBar";
 import { getBriefs, type BriefRow } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -10,26 +11,30 @@ export const dynamic = "force-dynamic";
 type InboxPageProps = {
   searchParams: {
     status?: string;
+    artist?: string;
   };
 };
 
 const FILTERS: Array<{ label: string; status?: BriefStatus }> = [
-  { label: "All" },
-  { label: "Incomplete", status: "incomplete" },
-  { label: "Ready", status: "ready_to_build" },
-  { label: "Building", status: "building" },
-  { label: "Needs James", status: "needs_james" },
-  { label: "Done", status: "done" }
+  { label: "Draft", status: "received" },
+  { label: "Completed", status: "done" }
 ];
+
+function matchesArtist(brief: BriefRow, artist: string): boolean {
+  return (brief.artist || "Unknown artist").trim().toLowerCase() === artist.trim().toLowerCase();
+}
 
 export default async function InboxPage({ searchParams }: InboxPageProps) {
   const role = requireUser();
-  const activeStatus = searchParams.status && isBriefStatus(searchParams.status) ? searchParams.status : undefined;
+  const activeStatus: BriefStatus = searchParams.status && isBriefStatus(searchParams.status) ? searchParams.status : "received";
+  const activeArtist = searchParams.artist?.trim() || "";
   let briefs: BriefRow[] = [];
+  let allBriefs: BriefRow[] = [];
   let errorMessage: string | null = null;
 
   try {
-    briefs = await getBriefs(activeStatus);
+    allBriefs = await getBriefs(activeArtist ? activeStatus : undefined);
+    briefs = activeArtist ? allBriefs.filter((brief) => matchesArtist(brief, activeArtist)) : allBriefs;
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "Unable to load briefs.";
   }
@@ -37,62 +42,63 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <>
       <TopBar role={role} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-white">Inbox</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              {activeStatus ? STATUS_LABELS[activeStatus] : "All campaign briefs"}
-            </p>
-          </div>
-          <Link
-            href="/new"
-            className="focus-ring rounded-md bg-teal-300 px-4 py-3 font-semibold text-ink hover:bg-teal-200"
-          >
-            New Brief
-          </Link>
-        </div>
-
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-          {FILTERS.map((filter) => {
-            const href = filter.status ? `/inbox?status=${filter.status}` : "/inbox";
-            const isActive = filter.status === activeStatus || (!filter.status && !activeStatus);
-
-            return (
-              <Link
-                key={filter.label}
-                href={href}
-                className={`focus-ring whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium ${
-                  isActive
-                    ? "border-teal-300/40 bg-teal-300/15 text-teal-100"
-                    : "border-white/10 text-zinc-300 hover:bg-white/10"
-                }`}
-              >
-                {filter.label}
-              </Link>
-            );
-          })}
-        </div>
-
+      <main className="mx-auto w-full max-w-[1540px] px-4 py-8 sm:px-6">
         {errorMessage ? (
-          <section className="mt-6 rounded-lg border border-amber-400/30 bg-amber-500/10 p-4 text-amber-100">
+          <section className="mt-6 pixel-alert p-4">
             {errorMessage}
           </section>
         ) : null}
 
-        {!errorMessage && briefs.length === 0 ? (
-          <section className="mt-8 rounded-lg border border-white/10 bg-panel p-8 text-center shadow-glow">
-            <h2 className="text-xl font-semibold text-white">No briefs yet.</h2>
-            <p className="mt-2 text-zinc-400">Paste a Claude campaign brief to get started.</p>
-          </section>
+        {!errorMessage && !activeArtist ? (
+          <ArtistDesktop briefs={allBriefs} />
         ) : null}
 
-        {briefs.length > 0 ? (
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            {briefs.map((brief) => (
-              <BriefCard key={brief.id} brief={brief} />
-            ))}
-          </div>
+        {!errorMessage && activeArtist ? (
+          <section className="folder-campaign-screen animate-rise">
+            <div className="desktop-titlebar" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="folder-campaign-header">
+              <div>
+                <p className="pixel-label">Artist folder</p>
+                <h1>{activeArtist}</h1>
+                <p>{STATUS_LABELS[activeStatus]} campaigns inside this folder.</p>
+              </div>
+              <div className="folder-campaign-actions">
+                <Link href="/" className="mini-button focus-ring">← Desktop</Link>
+                <Link href="/new" className="pixel-button focus-ring">+ New brief</Link>
+              </div>
+            </div>
+
+            <div className="folder-tabs" aria-label="Folder filters">
+              {FILTERS.map((filter) => {
+                const params = new URLSearchParams();
+                if (filter.status && filter.status !== "received") params.set("status", filter.status);
+                params.set("artist", activeArtist);
+                const href = `/inbox?${params.toString()}`;
+                const isActive = filter.status === activeStatus;
+                return (
+                  <Link key={filter.label} href={href} className={`focus-ring ${isActive ? "nav-chip nav-chip-active" : "nav-chip"}`}>
+                    {filter.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {briefs.length === 0 ? (
+              <div className="empty-desktop-panel mt-6 text-center">
+                <p className="pixel-label">Empty folder</p>
+                <h2>No {STATUS_LABELS[activeStatus].toLowerCase()} campaigns here.</h2>
+                <p>Switch status or create a new brief.</p>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <BriefSearchList briefs={briefs} />
+              </div>
+            )}
+          </section>
         ) : null}
       </main>
     </>

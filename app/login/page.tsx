@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentRole } from "@/lib/auth";
+import { canUseLocalDevPasscode, getCurrentRole } from "@/lib/auth";
 import { PasscodeLogin } from "@/components/PasscodeLogin";
 
 export const dynamic = "force-dynamic";
@@ -15,5 +15,10 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     redirect("/inbox");
   }
 
-  return <PasscodeLogin showError={searchParams.error === "1"} />;
+  return (
+    <PasscodeLogin
+      showError={searchParams.error === "1"}
+      showLocalDevPasscode={canUseLocalDevPasscode()}
+    />
+  );
 }

@@ -16,6 +16,7 @@ import {
   type JDWCampaignBrief,
 } from "@/lib/brief-schema";
 import { BriefFunnelView } from "@/components/BriefFunnelView";
+import { GeminiBriefPanel } from "@/components/GeminiBriefPanel";
 
 const MAX_JSON_FILE_LENGTH = 250_000;
 const AUTOSAVE_KEY = "jdw.manualBriefDraft.v2";
@@ -25,10 +26,20 @@ type BudgetType =
   "" | "daily" | "lifetime" | "campaign_total" | "ad_set_level" | "unknown";
 type Currency = "" | "GBP" | "EUR" | "USD" | "AUD" | "CAD" | "unknown";
 type AssetType = "" | "video" | "image" | "carousel" | "spark_ad" | "unknown";
+type Gender = "" | "all" | "male" | "female" | "unknown";
+type TargetingType =
+  "" | "broad" | "interest" | "lookalike" | "retargeting" | "advantage_plus" | "unknown";
 
 type WizardAdSet = {
   id: string;
   label: string;
+  locations: string;
+  age_min: string;
+  age_max: string;
+  gender: Gender;
+  placements: string;
+  targeting_type: TargetingType;
+  exclusions: string;
   notes: string;
   budget_enabled: boolean;
   budget_amount: string;
@@ -40,6 +51,8 @@ type WizardAd = {
   label: string;
   asset_type: AssetType;
   asset_links: string;
+  post_url: string;
+  boost_code: string;
   destination_url: string;
   copy: string;
   notes: string;
@@ -52,6 +65,7 @@ type CampaignSetup = {
   platform: Platform;
   account: string;
   acid: string;
+  asid: string;
   objective: string;
   campaign_type: string;
   conversion_location: string;
@@ -93,6 +107,15 @@ const AD_SET_BUDGET_OPTIONS = [
   "daily",
   "lifetime",
   "campaign_total",
+  "unknown",
+] as const;
+const GENDER_OPTIONS = ["all", "male", "female", "unknown"] as const;
+const TARGETING_OPTIONS = [
+  "broad",
+  "interest",
+  "lookalike",
+  "retargeting",
+  "advantage_plus",
   "unknown",
 ] as const;
 const ASSET_OPTIONS = [
@@ -144,7 +167,7 @@ const SLIDES = [
   { label: "Artist", hint: "Who is this for?" },
   { label: "Project", hint: "Track / tour / release" },
   { label: "Platform", hint: "Meta or TikTok" },
-  { label: "Account", hint: "Ad account + ACID" },
+  { label: "Account", hint: "Ad account + IDs" },
   { label: "Objective", hint: "What are we buying?" },
   { label: "Pixel", hint: "Only if relevant" },
   { label: "Budget", hint: "Money + dates" },
@@ -186,6 +209,13 @@ function newAdSet(label = ""): WizardAdSet {
   return {
     id: uid("adset"),
     label,
+    locations: "",
+    age_min: "",
+    age_max: "",
+    gender: "all",
+    placements: "",
+    targeting_type: "unknown",
+    exclusions: "",
     notes: "",
     budget_enabled: false,
     budget_amount: "",
@@ -199,6 +229,8 @@ function newAd(label = "", adSetIds: string[] = []): WizardAd {
     label,
     asset_type: "video",
     asset_links: "",
+    post_url: "",
+    boost_code: "",
     destination_url: "",
     copy: "",
     notes: "",
@@ -228,6 +260,7 @@ const EMPTY_SETUP: CampaignSetup = {
   platform: "",
   account: "",
   acid: "",
+  asid: "",
   objective: "",
   campaign_type: "",
   conversion_location: "",
@@ -248,8 +281,8 @@ function adToJson(ad: WizardAd, setup: CampaignSetup) {
     release_title: blankToNull(ad.label || setup.release_title),
     asset_type: blankToEnum(ad.asset_type),
     asset_links: splitList(ad.asset_links),
-    post_url: null,
-    boost_code: null,
+    post_url: blankToNull(ad.post_url),
+    boost_code: blankToNull(ad.boost_code),
     destination_url: blankToNull(ad.destination_url),
     copy: blankToNull(ad.copy),
     notes: blankToNull(ad.notes),
@@ -263,14 +296,14 @@ function buildBrief(
 ) {
   const nestedAdSets = adSets.map((adSet) => ({
     label: blankToNull(adSet.label),
-    locations: [],
-    age_min: null,
-    age_max: null,
-    gender: "all",
-    placements: [],
-    targeting_type: "unknown",
+    locations: splitList(adSet.locations || ""),
+    age_min: numberOrNull(adSet.age_min || ""),
+    age_max: numberOrNull(adSet.age_max || ""),
+    gender: blankToEnum((adSet.gender || "") as Gender),
+    placements: splitList(adSet.placements || ""),
+    targeting_type: blankToEnum((adSet.targeting_type || "") as TargetingType),
     targeting_details: blankToNull(adSet.notes),
-    exclusions: null,
+    exclusions: blankToNull(adSet.exclusions),
     budget_amount: adSet.budget_enabled
       ? numberOrNull(adSet.budget_amount)
       : null,
@@ -303,7 +336,7 @@ function buildBrief(
       artist: blankToNull(setup.artist),
       release_title: blankToNull(setup.release_title),
       acid: blankToNull(setup.acid),
-      asid: null,
+      asid: blankToNull(setup.asid),
       platform: blankToEnum(setup.platform),
       account: blankToNull(setup.account),
       objective: blankToNull(setup.objective),
@@ -420,7 +453,7 @@ function JsonImportPanel({
         className="flex w-full items-center justify-between gap-3 text-left"
       >
         <span>
-          <span className="pixel-label block">Optional Claude import</span>
+          <span className="pixel-label block">Optional JSON import</span>
           <span className="mt-1 block text-sm font-medium pixel-muted">
             Manual build is the main flow. JSON paste is only a shortcut.
           </span>
@@ -495,6 +528,7 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
     platform: (brief.campaign.platform || "") as Platform,
     account: brief.campaign.account || "",
     acid: brief.campaign.acid || "",
+    asid: brief.campaign.asid || "",
     objective: brief.campaign.objective || "",
     campaign_type: brief.campaign.campaign_type || "",
     conversion_location: brief.campaign.conversion_location || "",
@@ -526,6 +560,13 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
   ).map((adSet, index) => ({
     id: uid("adset"),
     label: adSet.label || `Ad set ${index + 1}`,
+    locations: (adSet.locations || []).join("\n"),
+    age_min: adSet.age_min === null || adSet.age_min === undefined ? "" : String(adSet.age_min),
+    age_max: adSet.age_max === null || adSet.age_max === undefined ? "" : String(adSet.age_max),
+    gender: (adSet.gender || "") as Gender,
+    placements: (adSet.placements || []).join("\n"),
+    targeting_type: (adSet.targeting_type || "") as TargetingType,
+    exclusions: adSet.exclusions || "",
     notes: adSet.targeting_details || adSet.notes || "",
     budget_enabled:
       adSet.budget_amount !== null && adSet.budget_amount !== undefined,
@@ -544,13 +585,9 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
         id: uid("ad"),
         label: ad.label || ad.release_title || `Ad ${nestedAds.length + 1}`,
         asset_type: (ad.asset_type || "") as AssetType,
-        asset_links: [
-          ...(ad.asset_links || []),
-          ad.post_url || "",
-          ad.boost_code || "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        asset_links: (ad.asset_links || []).join("\n"),
+        post_url: ad.post_url || "",
+        boost_code: ad.boost_code || "",
         destination_url: ad.destination_url || "",
         copy: ad.copy || "",
         notes: ad.notes || "",
@@ -566,13 +603,9 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
           id: uid("ad"),
           label: ad.label || ad.release_title || `Ad ${index + 1}`,
           asset_type: (ad.asset_type || "") as AssetType,
-          asset_links: [
-            ...(ad.asset_links || []),
-            ad.post_url || "",
-            ad.boost_code || "",
-          ]
-            .filter(Boolean)
-            .join("\n"),
+          asset_links: (ad.asset_links || []).join("\n"),
+          post_url: ad.post_url || "",
+          boost_code: ad.boost_code || "",
           destination_url: ad.destination_url || "",
           copy: ad.copy || "",
           notes: ad.notes || "",
@@ -590,6 +623,44 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
             adSets.map((adSet) => adSet.id),
           ),
         ],
+  };
+}
+
+function restoreAdSet(adSet: Partial<WizardAdSet>, index: number): WizardAdSet {
+  const fallback = newAdSet(`Ad set ${index + 1}`);
+  return {
+    ...fallback,
+    ...adSet,
+    id: adSet.id || fallback.id,
+    label: adSet.label || fallback.label,
+    locations: adSet.locations || "",
+    age_min: adSet.age_min || "",
+    age_max: adSet.age_max || "",
+    gender: adSet.gender || "all",
+    placements: adSet.placements || "",
+    targeting_type: adSet.targeting_type || "unknown",
+    exclusions: adSet.exclusions || "",
+    notes: adSet.notes || "",
+    budget_amount: adSet.budget_amount || "",
+    budget_type: adSet.budget_type || "",
+  };
+}
+
+function restoreAd(ad: Partial<WizardAd>, index: number, adSetIds: string[]): WizardAd {
+  const fallback = newAd(`Ad ${index + 1}`, adSetIds);
+  return {
+    ...fallback,
+    ...ad,
+    id: ad.id || fallback.id,
+    label: ad.label || fallback.label,
+    asset_type: ad.asset_type || "video",
+    asset_links: ad.asset_links || "",
+    post_url: ad.post_url || "",
+    boost_code: ad.boost_code || "",
+    destination_url: ad.destination_url || "",
+    copy: ad.copy || "",
+    notes: ad.notes || "",
+    assignedAdSetIds: ad.assignedAdSetIds || adSetIds,
   };
 }
 
@@ -636,6 +707,120 @@ function SummaryStrip({
         {ads.length} ad{ads.length === 1 ? "" : "s"}
       </span>
     </div>
+  );
+}
+
+const BUILD_MANUAL_ITEMS = [
+  {
+    step: "Import",
+    title: "Paste James talk",
+    body: "Drop the raw message, email, brief, links, or notes into Gemini."
+  },
+  {
+    step: "Check",
+    title: "Answer missing bits",
+    body: "Use the review prompts to ask James for anything he forgot."
+  },
+  {
+    step: "Build",
+    title: "Edit manually",
+    body: "Adjust campaign setup, ad sets, ads, copy, URLs, and budgets before saving."
+  },
+  {
+    step: "Save",
+    title: "Create draft",
+    body: "Save only after the structured brief looks right."
+  }
+] as const;
+
+function BuildManual() {
+  return (
+    <aside className="build-manual pixel-window p-4 sm:p-5">
+      <p className="pixel-label">Build manual</p>
+      <h2 className="mt-1 text-2xl font-black tracking-tight">Clear path from chat to campaign.</h2>
+      <div className="mt-4 grid gap-3">
+        {BUILD_MANUAL_ITEMS.map((item, index) => (
+          <div key={item.step} className="manual-step">
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function questionForMissingField(field: string): string {
+  if (field.includes("campaign.artist")) return "Who is the artist?";
+  if (field.includes("campaign.acid")) return "What is the ACID?";
+  if (field.includes("campaign.platform")) return "Which platform is this for?";
+  if (field.includes("campaign.account")) return "Which ad account should this be built in?";
+  if (field.includes("campaign.objective")) return "What objective are we buying against?";
+  if (field.includes("campaign.campaign_type")) return "What campaign type should this use?";
+  if (field.includes("campaign.conversion_location")) return "Where should conversions happen?";
+  if (field.includes("campaign.optimisation_event")) return "What optimisation event should be used?";
+  if (field.includes("campaign.pixel")) return "Which pixel should be attached?";
+  if (field.includes("budget.amount")) return "What is the budget amount?";
+  if (field.includes("budget.currency")) return "What currency is the budget in?";
+  if (field.includes("ad_sets")) return "What audience or ad set details are missing?";
+  if (field.includes("asset_type")) return "What type of creative asset is this?";
+  if (field.includes("asset_links")) return "Where are the asset links, post URL, or boost code?";
+  if (field.includes("copy")) return "What ad copy should be used?";
+  if (field.includes("destination_url")) return "What destination URL should the ad send people to?";
+  return `Can James confirm ${field}?`;
+}
+
+function slideForMissingField(field: string): number {
+  if (field.includes("artist")) return 0;
+  if (field.includes("release_title")) return 1;
+  if (field.includes("platform")) return 2;
+  if (field.includes("account") || field.includes("acid") || field.includes("asid")) return 3;
+  if (field.includes("objective") || field.includes("campaign_type")) return 4;
+  if (field.includes("conversion_location") || field.includes("optimisation_event") || field.includes("pixel")) return 5;
+  if (field.includes("budget") || field.includes("start_date") || field.includes("end_date")) return 6;
+  if (field.includes("ad_sets")) return 9;
+  if (field.includes("ads")) return 10;
+  return 11;
+}
+
+function MissingInfoCoach({
+  missingFields,
+  onEditField,
+}: {
+  missingFields: string[];
+  onEditField: (field: string) => void;
+}) {
+  const uniqueQuestions = Array.from(new Set(missingFields));
+
+  return (
+    <section className={`missing-coach ${uniqueQuestions.length === 0 ? "missing-coach-ready" : ""}`}>
+      <div>
+        <p className="pixel-label">Ask James</p>
+        <h4>{uniqueQuestions.length === 0 ? "Core brief looks complete." : "Things to confirm before build."}</h4>
+      </div>
+      {uniqueQuestions.length > 0 ? (
+        <div className="mt-4 grid gap-2">
+          {uniqueQuestions.map((field) => (
+            <button
+              key={field}
+              type="button"
+              className="missing-question"
+              onClick={() => onEditField(field)}
+            >
+              <span>{questionForMissingField(field)}</span>
+              <code>{field}</code>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm font-semibold pixel-muted">
+          Review the AI output, make any taste calls, then save the draft.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -803,8 +988,16 @@ export function NewBriefForm({
           slide?: number;
         };
         if (parsed.setup) setSetup({ ...EMPTY_SETUP, ...parsed.setup });
-        if (Array.isArray(parsed.adSets) && parsed.adSets.length > 0) setAdSets(parsed.adSets);
-        if (Array.isArray(parsed.ads) && parsed.ads.length > 0) setAds(parsed.ads);
+        if (Array.isArray(parsed.adSets) && parsed.adSets.length > 0) {
+          const restoredAdSets = parsed.adSets.map(restoreAdSet);
+          const restoredAdSetIds = restoredAdSets.map((adSet) => adSet.id);
+          setAdSets(restoredAdSets);
+          if (Array.isArray(parsed.ads) && parsed.ads.length > 0) {
+            setAds(parsed.ads.map((ad, index) => restoreAd(ad, index, restoredAdSetIds)));
+          }
+        } else if (Array.isArray(parsed.ads) && parsed.ads.length > 0) {
+          setAds(parsed.ads.map((ad, index) => restoreAd(ad, index, adSetIds)));
+        }
         if (typeof parsed.slide === "number") setSlide(Math.max(0, Math.min(SLIDES.length - 1, parsed.slide)));
         setAutosaveMessage("Autosave restored");
       }
@@ -832,6 +1025,36 @@ export function NewBriefForm({
   function clearImport() {
     setImportedJson(null);
     setImportedValidation(null);
+  }
+
+  function applyValidatedJson(
+    json: string,
+    validation: BriefValidationResult,
+    message: string,
+  ) {
+    if (!validation.ok) {
+      setSubmitError(validation.message);
+      return;
+    }
+
+    setSubmitError(null);
+
+    if (validation.briefs.length === 1) {
+      const nextState = briefToBuilderState(validation.briefs[0].brief);
+      setSetup(nextState.setup);
+      setAdSets(nextState.adSets);
+      setAds(nextState.ads);
+      setImportedJson(null);
+      setImportedValidation(null);
+      setSlide(11);
+      setAutosaveMessage(message);
+      return;
+    }
+
+    setImportedJson(json);
+    setImportedValidation(validation);
+    setSlide(11);
+    setAutosaveMessage(message);
   }
 
   function updateSetup<K extends keyof CampaignSetup>(
@@ -906,6 +1129,17 @@ export function NewBriefForm({
 
   return (
     <div className="one-by-one-builder">
+      <div className="builder-command-center">
+        {!briefId ? (
+          <GeminiBriefPanel
+            onGenerated={(json, validation, message) =>
+              applyValidatedJson(json, validation, message)
+            }
+          />
+        ) : null}
+        <BuildManual />
+      </div>
+
       <div className="pixel-window p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -965,7 +1199,6 @@ export function NewBriefForm({
               <h3>Who is the artist?</h3>
               <TextInput
                 list="saved-artists"
-                autoFocus
                 value={setup.artist}
                 onChange={(event) => updateSetup("artist", event.target.value)}
                 placeholder="Nemzzz / Trampolene / Father of Peace"
@@ -985,7 +1218,6 @@ export function NewBriefForm({
               <h3>What is the track, tour, or project?</h3>
               <TextInput
                 list="saved-projects"
-                autoFocus
                 value={setup.release_title}
                 onChange={(event) =>
                   updateSetup("release_title", event.target.value)
@@ -1025,7 +1257,7 @@ export function NewBriefForm({
             <section className="simple-question">
               <p className="pixel-label">Account + ACID</p>
               <h3>What account and ACID?</h3>
-              <div className="mx-auto mt-6 grid max-w-3xl gap-4 md:grid-cols-2">
+              <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
                 <FieldShell label="Account">
                   <TextInput
                     value={setup.account}
@@ -1040,9 +1272,16 @@ export function NewBriefForm({
                     placeholder="80JPUI"
                   />
                 </FieldShell>
+                <FieldShell label="ASID">
+                  <TextInput
+                    value={setup.asid}
+                    onChange={(e) => updateSetup("asid", e.target.value)}
+                    placeholder="ASID if supplied"
+                  />
+                </FieldShell>
               </div>
               <p className="helper-copy">
-                No ASID. If James has not given ACID yet, hit Skip.
+                If James has not given ACID or ASID yet, hit Skip.
               </p>
             </section>
           ) : null}
@@ -1210,7 +1449,6 @@ export function NewBriefForm({
               <p className="pixel-label">Context</p>
               <h3>Anything else James said?</h3>
               <TextArea
-                autoFocus
                 value={setup.campaign_notes}
                 onChange={(e) => updateSetup("campaign_notes", e.target.value)}
                 placeholder="Same song.so setup as previous, leave off for JD sign-off, account pending, etc."
@@ -1382,6 +1620,94 @@ export function NewBriefForm({
                               updateAdSet(adSet.id, { notes: e.target.value })
                             }
                             placeholder="Locations, age, placements, interest stack, LAL, retargeting notes..."
+                          />
+                        </FieldShell>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                      <FieldShell label="Locations">
+                        <TextArea
+                          value={adSet.locations}
+                          onChange={(e) =>
+                            updateAdSet(adSet.id, { locations: e.target.value })
+                          }
+                          placeholder={"UK\nIreland\nLondon"}
+                        />
+                      </FieldShell>
+                      <div className="grid grid-cols-2 gap-2">
+                        <FieldShell label="Age min">
+                          <TextInput
+                            inputMode="numeric"
+                            value={adSet.age_min}
+                            onChange={(e) =>
+                              updateAdSet(adSet.id, { age_min: e.target.value })
+                            }
+                            placeholder="18"
+                          />
+                        </FieldShell>
+                        <FieldShell label="Age max">
+                          <TextInput
+                            inputMode="numeric"
+                            value={adSet.age_max}
+                            onChange={(e) =>
+                              updateAdSet(adSet.id, { age_max: e.target.value })
+                            }
+                            placeholder="35"
+                          />
+                        </FieldShell>
+                      </div>
+                      <FieldShell label="Gender">
+                        <SelectInput
+                          value={adSet.gender}
+                          onChange={(e) =>
+                            updateAdSet(adSet.id, { gender: e.target.value as Gender })
+                          }
+                        >
+                          <option value="">Unknown</option>
+                          {GENDER_OPTIONS.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      </FieldShell>
+                      <FieldShell label="Targeting type">
+                        <SelectInput
+                          value={adSet.targeting_type}
+                          onChange={(e) =>
+                            updateAdSet(adSet.id, {
+                              targeting_type: e.target.value as TargetingType,
+                            })
+                          }
+                        >
+                          <option value="">Unknown</option>
+                          {TARGETING_OPTIONS.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      </FieldShell>
+                      <div className="lg:col-span-2">
+                        <FieldShell label="Placements">
+                          <TextArea
+                            value={adSet.placements}
+                            onChange={(e) =>
+                              updateAdSet(adSet.id, { placements: e.target.value })
+                            }
+                            placeholder={"Instagram Reels\nStories\nTikTok feed"}
+                          />
+                        </FieldShell>
+                      </div>
+                      <div className="lg:col-span-2">
+                        <FieldShell label="Exclusions">
+                          <TextArea
+                            value={adSet.exclusions}
+                            onChange={(e) =>
+                              updateAdSet(adSet.id, { exclusions: e.target.value })
+                            }
+                            placeholder="Existing purchasers, recent engagers, excluded territories..."
                           />
                         </FieldShell>
                       </div>
@@ -1570,9 +1896,27 @@ export function NewBriefForm({
                           placeholder="song.so / Linkfire"
                         />
                       </FieldShell>
+                      <FieldShell label="Post URL">
+                        <TextInput
+                          value={ad.post_url}
+                          onChange={(e) =>
+                            updateAd(ad.id, { post_url: e.target.value })
+                          }
+                          placeholder="Instagram / TikTok post URL"
+                        />
+                      </FieldShell>
+                      <FieldShell label="Boost code">
+                        <TextInput
+                          value={ad.boost_code}
+                          onChange={(e) =>
+                            updateAd(ad.id, { boost_code: e.target.value })
+                          }
+                          placeholder="Spark / boost code"
+                        />
+                      </FieldShell>
                       <div className="lg:col-span-2">
                         <FieldShell
-                          label="Asset links / post URLs / boost codes"
+                          label="Asset links"
                           hint="One per line is easiest."
                         >
                           <TextArea
@@ -1653,6 +1997,11 @@ export function NewBriefForm({
                 </p>
               </div>
 
+              <MissingInfoCoach
+                missingFields={missingFields}
+                onEditField={(field) => setSlide(slideForMissingField(field))}
+              />
+
               <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
 
               {missingFields.length > 0 ? (
@@ -1679,20 +2028,13 @@ export function NewBriefForm({
 
               <JsonImportPanel
                 onImported={(json, validation) => {
-                  if (validation.ok && validation.briefs.length === 1) {
-                    const nextState = briefToBuilderState(validation.briefs[0].brief);
-                    setSetup(nextState.setup);
-                    setAdSets(nextState.adSets);
-                    setAds(nextState.ads);
-                    setImportedJson(null);
-                    setImportedValidation(null);
-                    setSlide(11);
-                    setAutosaveMessage("Claude JSON mapped into builder");
-                    return;
-                  }
-                  setImportedJson(json);
-                  setImportedValidation(validation);
-                  setAutosaveMessage("Batch JSON ready to submit");
+                  applyValidatedJson(
+                    json,
+                    validation,
+                    validation.ok && validation.briefs.length > 1
+                      ? "Batch JSON ready to submit"
+                      : "JSON mapped into builder",
+                  );
                 }}
               />
 

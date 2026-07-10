@@ -150,6 +150,23 @@ export type BriefValidationResult =
       issues?: string[];
     };
 
+function normaliseVersionAliases(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  if ("brief_version" in record || !("version" in record)) {
+    return value;
+  }
+
+  const { version, ...rest } = record;
+  return {
+    ...rest,
+    brief_version: version
+  };
+}
+
 function isPresentString(value: string | null | undefined): boolean {
   return typeof value === "string" && value.trim().length > 0 && value.trim().toLowerCase() !== "unknown";
 }
@@ -288,9 +305,9 @@ export function validateBriefJson(rawJson: string): BriefValidationResult {
   let parsed: unknown;
 
   try {
-    parsed = JSON.parse(rawJson);
+    parsed = normaliseVersionAliases(JSON.parse(rawJson));
   } catch {
-    return { ok: false, message: "Invalid JSON. Ask Claude to output JDW_CAMPAIGN_BRIEF_V1 JSON only." };
+    return { ok: false, message: "Invalid JSON. Ask the AI parser to output JDW_CAMPAIGN_BRIEF_V1 JSON only." };
   }
 
   if (

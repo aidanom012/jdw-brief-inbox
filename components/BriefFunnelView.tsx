@@ -28,6 +28,8 @@ function sameAd(a: JDWAd, b: JDWAd): boolean {
     a.label === b.label &&
     a.release_title === b.release_title &&
     a.asset_type === b.asset_type &&
+    a.post_url === b.post_url &&
+    a.boost_code === b.boost_code &&
     a.destination_url === b.destination_url &&
     a.copy === b.copy &&
     JSON.stringify(a.asset_links || []) === JSON.stringify(b.asset_links || [])
@@ -158,140 +160,121 @@ export function BriefFunnelView({ brief }: BriefFunnelViewProps) {
   const [selected, setSelected] = useState<NodeSelection>({ type: "campaign", id: "campaign" });
   const details = selectedDetails(brief, selected, allAds);
   const platform = value(brief.campaign.platform, "Platform");
+  const totalAds = allAds.length;
+  const budgetLabel = [brief.budget.amount, brief.budget.currency, brief.budget.type].filter(Boolean).join(" / ") || "Budget TBC";
 
   function choose(next: NodeSelection) {
     setSelected(next);
   }
 
   return (
-    <section className="pixel-window funnel-section p-4 sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="flow-shell pixel-window p-4 sm:p-6">
+      <div className="flow-header">
         <div>
-          <p className="pixel-label">Funnel map</p>
-          <h2 className="mt-2 text-3xl font-black">{value(brief.campaign.artist, "Untitled campaign")}</h2>
-          <p className="mt-1 max-w-3xl font-semibold pixel-muted">
-            Spacious build map. Click any block and its detail drawer opens underneath.
-          </p>
+          <p className="pixel-label">Build flow</p>
+          <h2>{value(brief.campaign.artist, "Untitled campaign")}</h2>
+          <p>{truncate(nodeSummaryForPlatform(brief), "Objective missing", 96)}</p>
         </div>
-        <span className="pixel-flow-chip">{platform}</span>
+        <div className="flow-stat-grid">
+          <span><strong>{platform}</strong><small>Platform</small></span>
+          <span><strong>{brief.ad_sets.length}</strong><small>Ad sets</small></span>
+          <span><strong>{totalAds}</strong><small>Ads</small></span>
+          <span><strong>{budgetLabel}</strong><small>Budget</small></span>
+        </div>
       </div>
 
-      <div className="mt-5 pixel-flow-canvas pixel-card p-4">
-        <div className="pixel-flow-inner">
-          <div className="pixel-flow-grid">
-            <div className="pixel-flow-heading pixel-label">Campaign</div>
-            <div className="pixel-flow-heading pixel-label">Ad set / audience</div>
-            <div className="pixel-flow-heading pixel-label">Ad / asset</div>
-            <div className="pixel-flow-heading pixel-label">Destination</div>
-            <div className="pixel-flow-heading pixel-label">Result</div>
+      <div className="flow-layout">
+        <button
+          type="button"
+          onClick={() => choose({ type: "campaign", id: "campaign" })}
+          className={`flow-card flow-campaign-card ${selected.type === "campaign" ? "flow-card-active" : ""}`}
+        >
+          <span className="flow-eyebrow">Campaign</span>
+          <strong>{value(brief.campaign.release_title || brief.campaign.artist, "Campaign setup")}</strong>
+          <small>ACID {value(brief.campaign.acid, "missing")} · {value(brief.campaign.account, "account TBC")}</small>
+        </button>
 
-            <div className="pixel-flow-cell first-col" style={{ gridRow: `2 / span ${Math.max(brief.ad_sets.length, 1)}` }}>
-              <button
-                type="button"
-                onClick={() => choose({ type: "campaign", id: "campaign" })}
-                className={`pixel-node min-h-44 w-full p-6 text-left ${selected.type === "campaign" ? "pixel-node-active" : ""}`}
-              >
-                <span className="pixel-label block">Campaign</span>
-                <strong className="mt-3 block text-2xl leading-tight">{value(brief.campaign.artist)}</strong>
-                <span className="mt-4 block text-sm font-black uppercase tracking-[0.08em]">
-                  {truncate(nodeSummaryForPlatform(brief), "Objective missing", 62)}
-                </span>
-                <span className="mt-4 inline-flex pixel-flow-chip">ACID {value(brief.campaign.acid, "missing")}</span>
-              </button>
+        <div className="flow-lanes">
+          {brief.ad_sets.length === 0 ? (
+            <div className="flow-lane">
+              <div className="flow-card flow-empty-card">
+                <span className="flow-eyebrow">Audience</span>
+                <strong>No ad sets yet</strong>
+                <small>Add audience blocks in edit mode</small>
+              </div>
             </div>
+          ) : null}
 
-            {brief.ad_sets.length === 0 ? (
-              <div className="pixel-flow-cell">
-                <div className="pixel-node w-full p-6 text-left">
-                  <span className="pixel-label block">No ad sets yet</span>
-                  <strong className="mt-2 block text-lg">Add audience blocks in edit mode</strong>
+          {brief.ad_sets.map((adSet, adSetIndex) => {
+            const adsForSet = uniqueAdsForAdSet(brief, adSet, allAds);
+            const primaryAd = adsForSet[0];
+            const primaryAdIndex = primaryAd ? allAds.findIndex((ad) => sameAd(ad, primaryAd)) : -1;
+            const destination = primaryAd?.destination_url || primaryAd?.post_url || primaryAd?.boost_code || null;
+
+            return (
+              <div key={`${adSet.label || "adset"}-${adSetIndex}`} className="flow-lane">
+                <button
+                  type="button"
+                  onClick={() => choose({ type: "adset", id: String(adSetIndex) })}
+                  className={`flow-card flow-audience-card ${selected.type === "adset" && selected.id === String(adSetIndex) ? "flow-card-active" : ""}`}
+                >
+                  <span className="flow-eyebrow">Ad set {adSetIndex + 1}</span>
+                  <strong>{value(adSet.label, `Ad set ${adSetIndex + 1}`)}</strong>
+                  <small>{adsForSet.length} ads · {value(adSet.targeting_type, "targeting TBC")}</small>
+                </button>
+
+                <div className="flow-ad-stack">
+                  {adsForSet.length === 0 ? (
+                    <div className="flow-card flow-empty-card">
+                      <span className="flow-eyebrow">Ad</span>
+                      <strong>No ads assigned</strong>
+                      <small>Assign ads in edit mode</small>
+                    </div>
+                  ) : null}
+                  {adsForSet.map((ad, index) => {
+                    const allAdIndex = allAds.findIndex((candidate) => sameAd(candidate, ad));
+                    const safeIndex = allAdIndex >= 0 ? allAdIndex : index;
+                    return (
+                      <button
+                        key={`${adKey(ad, index)}-${adSetIndex}`}
+                        type="button"
+                        onClick={() => choose({ type: "ad", id: String(safeIndex) })}
+                        className={`flow-card flow-ad-card ${selected.type === "ad" && selected.id === String(safeIndex) ? "flow-card-active" : ""}`}
+                      >
+                        <span className="flow-eyebrow">Ad</span>
+                        <strong>{value(ad.label || ad.release_title, `Ad ${index + 1}`)}</strong>
+                        <small>{value(ad.asset_type, "asset")} · {truncate(ad.copy, "copy TBC", 42)}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!primaryAd}
+                  onClick={() => primaryAdIndex >= 0 && choose({ type: "destination", id: String(primaryAdIndex) })}
+                  className={`flow-card flow-destination-card disabled:cursor-not-allowed ${selected.type === "destination" && selected.id === String(primaryAdIndex) ? "flow-card-active" : ""}`}
+                >
+                  <span className="flow-eyebrow">Destination</span>
+                  <strong>{truncate(destination, "Destination TBC", 56)}</strong>
+                  <small>{primaryAd?.boost_code ? "Boost code present" : primaryAd?.post_url ? "Post URL present" : "Link check"}</small>
+                </button>
+
+                <div className="flow-card flow-result-card">
+                  <span className="flow-eyebrow">Result</span>
+                  <strong>{brief.campaign.platform === "TikTok" ? "Spark / views" : "Clicks / conversions"}</strong>
+                  <small>{value(brief.campaign.optimisation_event, "optimisation TBC")}</small>
                 </div>
               </div>
-            ) : null}
-
-            {brief.ad_sets.map((adSet, adSetIndex) => {
-              const adsForSet = uniqueAdsForAdSet(brief, adSet, allAds);
-              const primaryAd = adsForSet[0];
-              const primaryAdIndex = primaryAd ? allAds.findIndex((ad) => sameAd(ad, primaryAd)) : -1;
-              const destination = primaryAd?.destination_url || null;
-
-              return (
-                <div key={`${adSet.label || "adset"}-${adSetIndex}`} className="contents">
-                  <div className="pixel-flow-cell">
-                    <button
-                      type="button"
-                      onClick={() => choose({ type: "adset", id: String(adSetIndex) })}
-                      className={`pixel-node min-h-32 w-full p-5 text-left ${selected.type === "adset" && selected.id === String(adSetIndex) ? "pixel-node-active" : ""}`}
-                    >
-                      <span className="pixel-label block">Ad set {adSetIndex + 1}</span>
-                      <strong className="mt-2 block text-xl leading-tight">{value(adSet.label, `Ad set ${adSetIndex + 1}`)}</strong>
-                      <span className="mt-4 block text-xs font-black uppercase tracking-[0.08em]">
-                        {adsForSet.length} ads assigned
-                      </span>
-                    </button>
-                  </div>
-
-                  <div className="pixel-flow-cell">
-                    {adsForSet.length > 1 ? <span className="pixel-flow-joiner" /> : null}
-                    <div className="grid w-full gap-4">
-                      {adsForSet.length === 0 ? (
-                        <div className="pixel-node w-full p-5 text-left">
-                          <span className="pixel-label block">No ads</span>
-                          <strong className="mt-2 block text-sm">Assign ads in edit mode</strong>
-                        </div>
-                      ) : null}
-                      {adsForSet.map((ad, index) => {
-                        const allAdIndex = allAds.findIndex((candidate) => sameAd(candidate, ad));
-                        const safeIndex = allAdIndex >= 0 ? allAdIndex : index;
-                        return (
-                          <button
-                            key={`${adKey(ad, index)}-${adSetIndex}`}
-                            type="button"
-                            onClick={() => choose({ type: "ad", id: String(safeIndex) })}
-                            className={`pixel-node p-5 text-left ${selected.type === "ad" && selected.id === String(safeIndex) ? "pixel-node-active" : ""}`}
-                          >
-                            <span className="pixel-label block">Ad</span>
-                            <strong className="mt-1 block text-lg leading-tight">{value(ad.label || ad.release_title, `Ad ${index + 1}`)}</strong>
-                            <span className="mt-3 inline-flex pixel-flow-chip">{value(ad.asset_type, "asset")}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="pixel-flow-cell">
-                    <button
-                      type="button"
-                      disabled={!primaryAd}
-                      onClick={() => primaryAdIndex >= 0 && choose({ type: "destination", id: String(primaryAdIndex) })}
-                      className={`pixel-node min-h-28 w-full p-5 text-left disabled:cursor-not-allowed ${selected.type === "destination" && selected.id === String(primaryAdIndex) ? "pixel-node-active" : ""}`}
-                    >
-                      <span className="pixel-label block">Destination</span>
-                      <strong className="mt-2 block break-words text-sm leading-tight">
-                        {truncate(destination, "No destination yet", 72)}
-                      </strong>
-                    </button>
-                  </div>
-
-                  <div className="pixel-flow-cell">
-                    <div className="pixel-node pixel-node-soft min-h-28 w-full p-5 text-left">
-                      <span className="pixel-label block">Result</span>
-                      <strong className="mt-2 block text-base leading-tight">
-                        {brief.campaign.platform === "TikTok" ? "Views / Spark activity" : "Clicks / conversions / audience"}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
       </div>
 
-      <aside className="pixel-detail-drawer mt-5 p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b-3 border-black pb-3">
-          <span className="pixel-label">Detail drawer</span>
-          <span className="pixel-flow-chip">click blocks above to change this</span>
+      <aside className="flow-inspector">
+        <div className="flow-inspector-head">
+          <span className="pixel-label">Inspector</span>
+          <span className="flow-chip">select any block</span>
         </div>
         <DetailDrawer brief={brief} details={details} allAds={allAds} />
       </aside>

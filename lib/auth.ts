@@ -7,6 +7,7 @@ export type UserRole = "aidan" | "james";
 const COOKIE_NAME = "jdw_brief_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 const FULL_ACCESS_ROLE: UserRole = "aidan";
+export const LOCAL_DEV_PASSCODE = "local-jdw";
 
 function authSecret(): string {
   return (
@@ -105,12 +106,22 @@ function configuredPasscodes(): string[] {
   ].filter((value): value is string => Boolean(value && value.trim().length > 0));
 }
 
+export function hasConfiguredPasscode(): boolean {
+  return configuredPasscodes().length > 0;
+}
+
+export function canUseLocalDevPasscode(): boolean {
+  return process.env.NODE_ENV !== "production" && !hasConfiguredPasscode();
+}
+
 export function roleFromPasscode(passcode: string): UserRole | null {
   const cleanPasscode = passcode.trim();
   const passcodes = configuredPasscodes();
 
   if (passcodes.length === 0) {
-    return null;
+    return canUseLocalDevPasscode() && secureStringEqual(cleanPasscode, LOCAL_DEV_PASSCODE)
+      ? FULL_ACCESS_ROLE
+      : null;
   }
 
   return passcodes.some((storedPasscode) => secureStringEqual(cleanPasscode, storedPasscode))
