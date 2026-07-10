@@ -60,13 +60,14 @@ export class GeminiBriefError extends Error {
 
 const GEMINI_BRIEF_PROMPT = `You convert messy JDW / James Walker paid social campaign briefs into strict JSON for a private campaign brief builder.
 
-Return JSON only. Do not include markdown, comments, or explanations.
+Return valid JSON only. Do not include markdown fences, comments, headings, explanations, or prose before/after the JSON.
+Every string value must be valid JSON with escaped newlines/quotes.
 Do not guess missing fields. If a field is not clearly present, use null, "unknown", or [] as appropriate.
 Preserve exact details from the brief, including budgets, dates, links, ACID, ASID, pixel, optimisation event, account, platform, territory, targeting, ad copy, post URLs, boost codes, and asset links.
 Do not invent targeting, dates, budgets, pixels, campaign names, copy, or links.
 
 If the pasted text contains one campaign, return one JDW_CAMPAIGN_BRIEF_V1 object.
-If it contains multiple distinct campaign setups, return a JDW_CAMPAIGN_BRIEF_BATCH_V1 object with a briefs array.
+If it contains multiple distinct campaign setups, return a JDW_CAMPAIGN_BRIEF_BATCH_V1 object with a briefs array. Do not merge separate campaigns into one brief.
 
 Use this exact object shape for a single campaign:
 {
@@ -400,31 +401,109 @@ function extractGeneratedJsonText(response: unknown): string {
   throw new GeminiBriefError("Gemini did not return any JSON.", 502);
 }
 
-function parseJsonOnly(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const cleaned = text
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
+function stripMarkdownJsonFence(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
 
-    try {
-      return JSON.parse(cleaned);
-    } catch {
-      const firstObject = cleaned.indexOf("{");
-      const lastObject = cleaned.lastIndexOf("}");
-      if (firstObject >= 0 && lastObject > firstObject) {
-        try {
-          return JSON.parse(cleaned.slice(firstObject, lastObject + 1));
-        } catch {
-          throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502);
-        }
+function findBalancedJsonCandidate(text: string): string | null {
+  const cleaned = stripMarkdownJsonFence(text);
+  const start = cleaned.search(/[\[{]/);
+  if (start < 0) {
+    return null;
+  }
+
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < cleaned.length; index += 1) {
+    const char = cleaned[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      stack.push("}");
+      continue;
+    }
+
+    if (char === "[") {
+      stack.push("]");
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      const expected = stack.pop();
+      if (expected !== char) {
+        return null;
       }
 
-      throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502);
+      if (stack.length === 0) {
+        return cleaned.slice(start, index + 1);
+      }
     }
   }
+
+  return null;
+}
+
+function normaliseGeneratedJsonShape(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const briefObjects = value.filter(isJsonObject);
+    if (briefObjects.length > 0) {
+      return {
+        brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
+        briefs: briefObjects
+      };
+    }
+  }
+
+  if (isJsonObject(value) && Array.isArray(value.briefs) && !value.brief_version) {
+    return {
+      ...value,
+      brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1"
+    };
+  }
+
+  return value;
+}
+
+function parseJsonOnly(text: string): unknown {
+  const attempts = [text.trim(), stripMarkdownJsonFence(text)];
+  const balancedCandidate = findBalancedJsonCandidate(text);
+  if (balancedCandidate) {
+    attempts.push(balancedCandidate);
+  }
+
+  const uniqueAttempts = Array.from(new Set(attempts.filter(Boolean)));
+  for (const candidate of uniqueAttempts) {
+    try {
+      return normaliseGeneratedJsonShape(JSON.parse(candidate));
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502, [
+    stripMarkdownJsonFence(text).slice(0, 500)
+  ]);
 }
 
 function validationIssues(validation: BriefValidationResult): string[] | undefined {

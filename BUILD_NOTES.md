@@ -1,27 +1,21 @@
-# JDW Soft Finder Desktop Style
+# Build Notes
 
-Style rethink pass:
-- calmer graphite background instead of harsh mono grid
-- warm paper windows with subtle tactile texture
-- clean Finder-like folder icons with no clipping
-- softer spacing and larger desktop/folder breathing room
-- neutral beige hover state instead of loud colour scheme
-- kept the existing swipe builder, delete, autosave, duplicate, export, folder workflow and login changes
+## Gemini JSON hardening patch
 
-No Supabase changes required.
+- Default Gemini model remains `gemini-3.5-flash`.
+- The parser still supports single-campaign and multi-campaign output:
+  - Single: `JDW_CAMPAIGN_BRIEF_V1`
+  - Batch: `JDW_CAMPAIGN_BRIEF_BATCH_V1` with a `briefs` array
+- The `/new` UI still shows multiple generated briefs as selectable buttons when Gemini returns a batch.
+- Hardened `lib/gemini-brief.ts` so Gemini responses are parsed more safely when the model returns:
+  - JSON inside markdown code fences
+  - valid JSON with text before/after it
+  - a raw array of briefs instead of a batch wrapper
+  - a `{ briefs: [...] }` object missing the batch version field
+- Strengthened the prompt so Gemini is told to return valid JSON only, with no markdown/prose.
+- `npm run typecheck` passed.
+- `npm run build` passed.
 
-## 2026-07-10 Gemini model fix
-- Set the default Gemini model to `gemini-3.5-flash`.
-- Removed the confusing `gemini-3.1-flash-lite` default from docs and code.
-- Removed the `GEMINI_ALLOW_HIGHER_COST_MODELS` gate because `gemini-3.5-flash` is now the intentional primary model.
-- Kept the denylist for unavailable older model IDs such as `gemini-2.5-flash` and Gemini 2.0 model IDs.
-- Kept 503 retry handling. Temporary overload errors retry briefly, then return a clear message instead of failing silently.
+## Important
 
-Use these env vars locally and in Vercel:
-
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_MAX_OUTPUT_TOKENS=4096
-GEMINI_FALLBACK_MODELS=
-```
+The app still does not auto-save Gemini output. The user reviews/edits the generated brief before clicking the normal save button.
