@@ -54,6 +54,13 @@ type CampaignSetup = {
   campaign_notes: string;
 };
 
+type NewBriefFormProps = {
+  initialBrief?: JDWCampaignBrief;
+  briefId?: string;
+  savedArtists?: string[];
+  savedProjects?: string[];
+};
+
 const PLATFORM_OPTIONS = ["Meta", "TikTok", "YouTube", "Other"] as const;
 const CURRENCY_OPTIONS = ["GBP", "EUR", "USD", "AUD", "CAD", "unknown"] as const;
 const BUDGET_OPTIONS = ["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"] as const;
@@ -74,11 +81,19 @@ const CAMPAIGN_TYPE_PRESETS = ["Engagement", "Sales", "Traffic", "Video Views", 
 const CONVERSION_LOCATION_PRESETS = ["Website", "Instagram profile", "TikTok profile", "App", "None", "Unknown"];
 const OPTIMISATION_PRESETS = ["ViewContent", "FeatureFM_click", "Purchase", "Landing Page View", "ThruPlay", "15-sec engaged view", "Unknown"];
 
-const STEPS = [
-  { number: 1, label: "Campaign", sub: "known info" },
-  { number: 2, label: "Ad sets", sub: "audiences" },
-  { number: 3, label: "Ads", sub: "assets + copy" },
-  { number: 4, label: "Funnel", sub: "review" }
+const SLIDES = [
+  { label: "Artist", hint: "Who is this for?" },
+  { label: "Project", hint: "Track / tour / release" },
+  { label: "Platform", hint: "Meta or TikTok" },
+  { label: "Account", hint: "Ad account + ACID" },
+  { label: "Objective", hint: "What are we buying?" },
+  { label: "Pixel", hint: "Only if relevant" },
+  { label: "Budget", hint: "Money + dates" },
+  { label: "Notes", hint: "Anything James said" },
+  { label: "Ad sets", hint: "How many audiences?" },
+  { label: "Ad details", hint: "What each one targets" },
+  { label: "Ads", hint: "Assets + copy" },
+  { label: "Review", hint: "Save draft" }
 ] as const;
 
 function uid(prefix: string): string {
@@ -275,7 +290,7 @@ function JsonImportPanel({ onImported }: { onImported: (json: string, validation
       return;
     }
     onImported(value, validation);
-    setMessage("JSON validated. Submit from the funnel screen, or keep building manually.");
+    setMessage("JSON validated. Save it from this review screen.");
   }
 
   async function importJsonFile(event: ChangeEvent<HTMLInputElement>) {
@@ -296,7 +311,7 @@ function JsonImportPanel({ onImported }: { onImported: (json: string, validation
       <button type="button" onClick={() => setOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
         <span>
           <span className="pixel-label block">Optional Claude import</span>
-          <span className="mt-1 block text-sm font-medium pixel-muted">Manual builder is the main flow. JSON paste is just a shortcut.</span>
+          <span className="mt-1 block text-sm font-medium pixel-muted">Manual build is the main flow. JSON paste is only a shortcut.</span>
         </span>
         <span className="mini-button">{open ? "close" : "open"}</span>
       </button>
@@ -335,14 +350,10 @@ function fitAdSetCount(current: WizardAdSet[], count: number): WizardAdSet[] {
   ];
 }
 
-function applyToAllAdSets(adSets: WizardAdSet[], values: Partial<WizardAdSet>): WizardAdSet[] {
-  return adSets.map((adSet) => ({ ...adSet, ...values }));
-}
-
-
 function briefToBuilderState(brief?: JDWCampaignBrief): { setup: CampaignSetup; adSets: WizardAdSet[]; ads: WizardAd[] } {
   if (!brief) {
-    return { setup: EMPTY_SETUP, adSets: [newAdSet("Ad set 1")], ads: [newAd("Ad 1", [])] };
+    const firstAdSet = newAdSet("Ad set 1");
+    return { setup: EMPTY_SETUP, adSets: [firstAdSet], ads: [newAd("Ad 1", [firstAdSet.id])] };
   }
 
   const setup: CampaignSetup = {
@@ -377,10 +388,10 @@ function briefToBuilderState(brief?: JDWCampaignBrief): { setup: CampaignSetup; 
   const nestedAds: WizardAd[] = [];
   brief.ad_sets.forEach((adSet, adSetIndex) => {
     const adSetId = adSets[adSetIndex]?.id;
-    (adSet.ads || []).forEach((ad, index) => {
+    (adSet.ads || []).forEach((ad) => {
       nestedAds.push({
         id: uid("ad"),
-        label: ad.label || ad.release_title || `Ad ${nestedAds.length + index + 1}`,
+        label: ad.label || ad.release_title || `Ad ${nestedAds.length + 1}`,
         asset_type: (ad.asset_type || "") as AssetType,
         asset_links: [...(ad.asset_links || []), ad.post_url || "", ad.boost_code || ""].filter(Boolean).join("\n"),
         destination_url: ad.destination_url || "",
@@ -416,11 +427,22 @@ function FunnelPreview({ setup, adSets, ads }: { setup: CampaignSetup; adSets: W
   return <BriefFunnelView brief={previewBrief} />;
 }
 
+function SummaryStrip({ setup, adSets, ads }: { setup: CampaignSetup; adSets: WizardAdSet[]; ads: WizardAd[] }) {
+  return (
+    <div className="quick-summary">
+      <span>{setup.artist || "artist?"}</span>
+      <span>{setup.release_title || "project?"}</span>
+      <span>{setup.platform || "platform?"}</span>
+      <span>{adSets.length} ad set{adSets.length === 1 ? "" : "s"}</span>
+      <span>{ads.length} ad{ads.length === 1 ? "" : "s"}</span>
+    </div>
+  );
+}
 
-export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCampaignBrief; briefId?: string }) {
+export function NewBriefForm({ initialBrief, briefId, savedArtists = [], savedProjects = [] }: NewBriefFormProps) {
   const router = useRouter();
   const initialState = useMemo(() => briefToBuilderState(initialBrief), [initialBrief]);
-  const [step, setStep] = useState(1);
+  const [slide, setSlide] = useState(0);
   const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
   const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
   const [ads, setAds] = useState<WizardAd[]>(initialState.ads);
@@ -441,6 +463,7 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
     ? activeValidation.briefs.reduce((fields, brief) => [...fields, ...brief.missingFields], [] as string[])
     : [];
   const activeJson = importedValidation?.ok && importedJson ? importedJson : manualJson;
+  const currentSlide = SLIDES[slide];
 
   function clearImport() {
     setImportedJson(null);
@@ -467,15 +490,20 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
     setAdSets((current) => {
       const next = fitAdSetCount(current, count);
       const nextIds = next.map((adSet) => adSet.id);
-      setAds((currentAds) => currentAds.map((ad) => ({ ...ad, assignedAdSetIds: ad.assignedAdSetIds.filter((id) => nextIds.includes(id)) })));
+      setAds((currentAds) => currentAds.map((ad) => ({
+        ...ad,
+        assignedAdSetIds: ad.assignedAdSetIds.length ? ad.assignedAdSetIds.filter((id) => nextIds.includes(id)) : nextIds
+      })));
       return next;
     });
   }
 
-  function duplicateAdSet(adSet: WizardAdSet) {
-    clearImport();
-    const duplicated = { ...adSet, id: uid("adset"), label: `${adSet.label || "Ad set"} copy` };
-    setAdSets((current) => [...current, duplicated]);
+  function nextSlide() {
+    setSlide((current) => Math.min(SLIDES.length - 1, current + 1));
+  }
+
+  function previousSlide() {
+    setSlide((current) => Math.max(0, current - 1));
   }
 
   function submitBrief() {
@@ -499,121 +527,197 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="pixel-window p-3">
-        <div className="grid gap-2 sm:grid-cols-4">
-          {STEPS.map((item) => (
+    <div className="one-by-one-builder">
+      <div className="pixel-window p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="pixel-label">Step {slide + 1} of {SLIDES.length}</p>
+            <h2 className="mt-1 text-3xl font-black tracking-tight">{currentSlide.label}</h2>
+            <p className="mt-1 text-sm font-semibold pixel-muted">{currentSlide.hint}</p>
+          </div>
+          <SummaryStrip setup={setup} adSets={adSets} ads={ads} />
+        </div>
+        <div className="mt-4 h-4 border-3 border-black bg-white">
+          <div className="h-full bg-[#eb5160] transition-all duration-300" style={{ width: `${((slide + 1) / SLIDES.length) * 100}%` }} />
+        </div>
+        <div className="mt-4 hidden gap-2 lg:flex">
+          {SLIDES.map((item, index) => (
             <button
-              key={item.number}
+              key={item.label}
               type="button"
-              onClick={() => setStep(item.number)}
-              className={`pixel-tab ${step === item.number ? "pixel-tab-active" : ""}`}
-            >
-              <span className="font-mono text-xs font-black uppercase tracking-[0.18em]">0{item.number}</span>
-              <span className="mt-1 block text-lg font-black">{item.label}</span>
-              <span className="mt-1 block text-xs font-bold uppercase tracking-[0.12em]">{item.sub}</span>
-            </button>
+              onClick={() => setSlide(index)}
+              className={`step-dot ${index === slide ? "step-dot-active" : ""}`}
+              aria-label={`Go to ${item.label}`}
+            />
           ))}
         </div>
       </div>
 
-      <div className="animate-rise pixel-window p-4 sm:p-6">
-        {step === 1 ? (
-          <section className="grid gap-5">
-            <div>
-              <p className="pixel-label">Step 1</p>
-              <h2 className="mt-2 text-3xl font-black">Campaign setup</h2>
-              <p className="mt-2 text-sm font-semibold pixel-muted">Only campaign-level facts here. Leave unknown things blank.</p>
-            </div>
+      <div key={slide} className="swipe-card pixel-window p-5 sm:p-8">
+        {slide === 0 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Artist folder</p>
+            <h3>Who is the artist?</h3>
+            <TextInput
+              list="saved-artists"
+              autoFocus
+              value={setup.artist}
+              onChange={(event) => updateSetup("artist", event.target.value)}
+              placeholder="Nemzzz / Trampolene / Father of Peace"
+              className="mega-field"
+            />
+            <DataList id="saved-artists" options={savedArtists} />
+            <p className="helper-copy">If this artist already exists, pick it from the dropdown and the brief will live in that artist folder.</p>
+          </section>
+        ) : null}
 
-            <div className="grid gap-5">
-              <div className="pixel-card p-4">
-                <p className="pixel-label">Core details</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <FieldShell label="Artist"><TextInput value={setup.artist} onChange={(e) => updateSetup("artist", e.target.value)} /></FieldShell>
-                  <FieldShell label="Release / project"><TextInput value={setup.release_title} onChange={(e) => updateSetup("release_title", e.target.value)} /></FieldShell>
-                  <FieldShell label="Platform">
-                    <SelectInput value={setup.platform} onChange={(e) => updateSetup("platform", e.target.value as Platform)}>
-                      <option value="">Unknown</option>
-                      {PLATFORM_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </SelectInput>
-                  </FieldShell>
-                  <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} /></FieldShell>
-                  <FieldShell label="ACID"><TextInput value={setup.acid} onChange={(e) => updateSetup("acid", e.target.value)} /></FieldShell>
-                  <FieldShell label="Objective">
-                    <TextInput list="objective-presets" value={setup.objective} onChange={(e) => updateSetup("objective", e.target.value)} />
-                    <DataList id="objective-presets" options={OBJECTIVE_PRESETS} />
-                  </FieldShell>
-                  <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} /></FieldShell>
-                  <FieldShell label="Budget type">
-                    <SelectInput value={setup.budget_type} onChange={(e) => updateSetup("budget_type", e.target.value as BudgetType)}>
-                      <option value="">Unknown</option>
-                      {BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </SelectInput>
-                  </FieldShell>
-                  <FieldShell label="Currency">
-                    <SelectInput value={setup.currency} onChange={(e) => updateSetup("currency", e.target.value as Currency)}>
-                      <option value="">Unknown</option>
-                      {CURRENCY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </SelectInput>
-                  </FieldShell>
-                </div>
-              </div>
+        {slide === 1 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Project</p>
+            <h3>What is the track, tour, or project?</h3>
+            <TextInput
+              list="saved-projects"
+              autoFocus
+              value={setup.release_title}
+              onChange={(event) => updateSetup("release_title", event.target.value)}
+              placeholder="Super Powers / South Wales Tour / No Complaints"
+              className="mega-field"
+            />
+            <DataList id="saved-projects" options={savedProjects} />
+            <p className="helper-copy">This becomes the project name inside the artist folder.</p>
+          </section>
+        ) : null}
 
-              <details className="pixel-card p-4">
-                <summary className="cursor-pointer font-mono text-sm font-black uppercase tracking-[0.16em]">
-                  Platform setup / dates / pixel
-                </summary>
-                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <FieldShell label="Campaign type">
-                    <TextInput list="campaign-type-presets" value={setup.campaign_type} onChange={(e) => updateSetup("campaign_type", e.target.value)} />
-                    <DataList id="campaign-type-presets" options={CAMPAIGN_TYPE_PRESETS} />
-                  </FieldShell>
-                  <FieldShell label="Conversion location">
-                    <TextInput list="conversion-presets" value={setup.conversion_location} onChange={(e) => updateSetup("conversion_location", e.target.value)} />
-                    <DataList id="conversion-presets" options={CONVERSION_LOCATION_PRESETS} />
-                  </FieldShell>
-                  <FieldShell label="Optimisation event">
-                    <TextInput list="optimisation-presets" value={setup.optimisation_event} onChange={(e) => updateSetup("optimisation_event", e.target.value)} />
-                    <DataList id="optimisation-presets" options={OPTIMISATION_PRESETS} />
-                  </FieldShell>
-                  <FieldShell label="Pixel"><TextInput value={setup.pixel} onChange={(e) => updateSetup("pixel", e.target.value)} /></FieldShell>
-                  <FieldShell label="Start date"><TextInput type="date" value={setup.start_date} onChange={(e) => updateSetup("start_date", e.target.value)} /></FieldShell>
-                  <FieldShell label="End date"><TextInput type="date" value={setup.end_date} onChange={(e) => updateSetup("end_date", e.target.value)} /></FieldShell>
-                  <FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / FR NL BE / Global" /></FieldShell>
-                </div>
-              </details>
-
-              <FieldShell label="Campaign notes"><TextArea value={setup.campaign_notes} onChange={(e) => updateSetup("campaign_notes", e.target.value)} placeholder="Anything James says that matters but doesn't fit a field." /></FieldShell>
+        {slide === 2 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Platform</p>
+            <h3>Where is this campaign being built?</h3>
+            <div className="choice-grid mt-6">
+              {PLATFORM_OPTIONS.map((value) => (
+                <button key={value} type="button" onClick={() => { updateSetup("platform", value); }} className={`choice-card ${setup.platform === value ? "choice-card-active" : ""}`}>
+                  {value}
+                </button>
+              ))}
             </div>
           </section>
         ) : null}
 
-        {step === 2 ? (
-          <section className="grid gap-5">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="pixel-label">Step 2</p>
-                <h2 className="mt-2 text-3xl font-black">Ad sets</h2>
-                <p className="mt-2 text-sm font-semibold pixel-muted">Keep it human: what each ad set does, who it targets, and optional budget.</p>
-              </div>
-              <FieldShell label="How many ad sets?">
-                <TextInput
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={adSets.length}
-                  onChange={(event) => changeAdSetCount(Number(event.target.value))}
-                  className="max-w-32 text-center text-xl font-black"
-                />
+        {slide === 3 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Account + ACID</p>
+            <h3>What account and ACID?</h3>
+            <div className="mx-auto mt-6 grid max-w-3xl gap-4 md:grid-cols-2">
+              <FieldShell label="Account"><TextInput value={setup.account} onChange={(e) => updateSetup("account", e.target.value)} placeholder="Atlantic Records UK / Trade Secret..." /></FieldShell>
+              <FieldShell label="ACID"><TextInput value={setup.acid} onChange={(e) => updateSetup("acid", e.target.value)} placeholder="80JPUI" /></FieldShell>
+            </div>
+            <p className="helper-copy">No ASID. If James has not given ACID yet, hit Skip.</p>
+          </section>
+        ) : null}
+
+        {slide === 4 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Objective</p>
+            <h3>What is the campaign trying to do?</h3>
+            <div className="mx-auto mt-6 grid max-w-3xl gap-4 md:grid-cols-2">
+              <FieldShell label="Objective">
+                <TextInput list="objective-presets" value={setup.objective} onChange={(e) => updateSetup("objective", e.target.value)} placeholder="Streaming Conversions" />
+                <DataList id="objective-presets" options={OBJECTIVE_PRESETS} />
               </FieldShell>
+              <FieldShell label="Campaign type">
+                <TextInput list="campaign-type-presets" value={setup.campaign_type} onChange={(e) => updateSetup("campaign_type", e.target.value)} placeholder="Engagement / Sales / Traffic" />
+                <DataList id="campaign-type-presets" options={CAMPAIGN_TYPE_PRESETS} />
+              </FieldShell>
+            </div>
+          </section>
+        ) : null}
+
+        {slide === 5 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Tracking</p>
+            <h3>Pixel, conversion location, and event?</h3>
+            <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
+              <FieldShell label="Conversion location">
+                <TextInput list="conversion-presets" value={setup.conversion_location} onChange={(e) => updateSetup("conversion_location", e.target.value)} placeholder="Website" />
+                <DataList id="conversion-presets" options={CONVERSION_LOCATION_PRESETS} />
+              </FieldShell>
+              <FieldShell label="Optimisation event">
+                <TextInput list="optimisation-presets" value={setup.optimisation_event} onChange={(e) => updateSetup("optimisation_event", e.target.value)} placeholder="FeatureFM_click" />
+                <DataList id="optimisation-presets" options={OPTIMISATION_PRESETS} />
+              </FieldShell>
+              <FieldShell label="Pixel"><TextInput value={setup.pixel} onChange={(e) => updateSetup("pixel", e.target.value)} placeholder="Pixel ID / name" /></FieldShell>
+            </div>
+            <p className="helper-copy">For TikTok views or basic boosts, you can usually skip this.</p>
+          </section>
+        ) : null}
+
+        {slide === 6 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Budget + dates</p>
+            <h3>How much money and when?</h3>
+            <div className="mx-auto mt-6 grid max-w-5xl gap-4 md:grid-cols-3">
+              <FieldShell label="Budget amount"><TextInput inputMode="decimal" value={setup.budget_amount} onChange={(e) => updateSetup("budget_amount", e.target.value)} placeholder="250" /></FieldShell>
+              <FieldShell label="Budget type">
+                <SelectInput value={setup.budget_type} onChange={(e) => updateSetup("budget_type", e.target.value as BudgetType)}>
+                  <option value="">Unknown</option>
+                  {BUDGET_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </SelectInput>
+              </FieldShell>
+              <FieldShell label="Currency">
+                <SelectInput value={setup.currency} onChange={(e) => updateSetup("currency", e.target.value as Currency)}>
+                  <option value="">Unknown</option>
+                  {CURRENCY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </SelectInput>
+              </FieldShell>
+              <FieldShell label="Start date"><TextInput type="date" value={setup.start_date} onChange={(e) => updateSetup("start_date", e.target.value)} /></FieldShell>
+              <FieldShell label="End date"><TextInput type="date" value={setup.end_date} onChange={(e) => updateSetup("end_date", e.target.value)} /></FieldShell>
+              <FieldShell label="Territory summary"><TextInput value={setup.territory_summary} onChange={(e) => updateSetup("territory_summary", e.target.value)} placeholder="UK / FR NL BE / Global" /></FieldShell>
+            </div>
+          </section>
+        ) : null}
+
+        {slide === 7 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Context</p>
+            <h3>Anything else James said?</h3>
+            <TextArea
+              autoFocus
+              value={setup.campaign_notes}
+              onChange={(e) => updateSetup("campaign_notes", e.target.value)}
+              placeholder="Same song.so setup as previous, leave off for JD sign-off, account pending, etc."
+              className="mx-auto mt-6 max-w-4xl text-lg"
+            />
+          </section>
+        ) : null}
+
+        {slide === 8 ? (
+          <section className="simple-question">
+            <p className="pixel-label">Ad sets</p>
+            <h3>How many ad sets?</h3>
+            <TextInput
+              type="number"
+              min={1}
+              max={24}
+              value={adSets.length}
+              onChange={(event) => changeAdSetCount(Number(event.target.value))}
+              className="mega-field mx-auto max-w-60 text-center"
+            />
+            <p className="helper-copy">Example: 1 broad ad set, 5 city ad sets, or 2 test cells.</p>
+          </section>
+        ) : null}
+
+        {slide === 9 ? (
+          <section className="grid gap-5">
+            <div className="text-center">
+              <p className="pixel-label">Ad set details</p>
+              <h3 className="text-3xl font-black">What does each ad set do?</h3>
+              <p className="helper-copy">Keep it simple: name, targeting notes, optional budget.</p>
             </div>
 
             <div className="pixel-card p-4">
               <div className="grid gap-4 lg:grid-cols-3">
                 <div className="lg:col-span-2">
-                  <FieldShell label="Same note for every ad set" hint="Useful when all ad sets share the same audience rules.">
-                    <TextArea value={sameAdSetNotes} onChange={(e) => setSameAdSetNotes(e.target.value)} placeholder="Example: IG only, 18-35, Advantage+ off, no expansion..." />
+                  <FieldShell label="Same note for every ad set">
+                    <TextArea value={sameAdSetNotes} onChange={(e) => setSameAdSetNotes(e.target.value)} placeholder="IG only, 18-35, Advantage+ off, no expansion..." />
                   </FieldShell>
                 </div>
                 <div className="grid gap-3">
@@ -635,15 +739,16 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
                     className="pixel-button text-xs"
                     onClick={() => {
                       clearImport();
-                      setAdSets((current) => applyToAllAdSets(current, {
+                      setAdSets((current) => current.map((adSet) => ({
+                        ...adSet,
                         notes: sameAdSetNotes,
                         budget_enabled: sameBudgetEnabled,
                         budget_amount: sameBudgetAmount,
                         budget_type: sameBudgetType
-                      }));
+                      })));
                     }}
                   >
-                    Apply to all
+                    Apply to all ad sets
                   </button>
                 </div>
               </div>
@@ -655,12 +760,9 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="pixel-label">Ad set {adSetIndex + 1}</p>
-                      <h3 className="mt-1 text-2xl font-black">{adSet.label || `Ad set ${adSetIndex + 1}`}</h3>
+                      <h4 className="mt-1 text-2xl font-black">{adSet.label || `Ad set ${adSetIndex + 1}`}</h4>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => duplicateAdSet(adSet)} className="mini-button">Duplicate</button>
-                      {adSets.length > 1 ? <button type="button" onClick={() => setAdSets((current) => current.filter((item) => item.id !== adSet.id))} className="mini-button danger">Delete</button> : null}
-                    </div>
+                    <button type="button" onClick={() => setAdSets((current) => [...current, { ...adSet, id: uid("adset"), label: `${adSet.label || "Ad set"} copy` }])} className="mini-button">Duplicate</button>
                   </div>
 
                   <div className="mt-5 grid gap-4 lg:grid-cols-3">
@@ -671,7 +773,7 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
                   <div className="mt-4 grid gap-3 lg:grid-cols-3">
                     <label className="pixel-panel flex items-center gap-3 p-4">
                       <input type="checkbox" checked={adSet.budget_enabled} onChange={(e) => updateAdSet(adSet.id, { budget_enabled: e.target.checked })} className="h-5 w-5" />
-                      <span><span className="block font-black">Ad set budget?</span><span className="text-sm font-semibold pixel-muted">Only if budget is split here.</span></span>
+                      <span><span className="block font-black">Ad set budget?</span><span className="text-sm font-semibold pixel-muted">Only if split here.</span></span>
                     </label>
                     {adSet.budget_enabled ? (
                       <>
@@ -691,13 +793,13 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
           </section>
         ) : null}
 
-        {step === 3 ? (
+        {slide === 10 ? (
           <section className="grid gap-5">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="pixel-label">Step 3</p>
-                <h2 className="mt-2 text-3xl font-black">Ads</h2>
-                <p className="mt-2 text-sm font-semibold pixel-muted">Make the ad once, then tick which ad sets it should go to.</p>
+                <p className="pixel-label">Ads</p>
+                <h3 className="text-3xl font-black">Create ads once. Send them to any ad set.</h3>
+                <p className="helper-copy text-left">Tick 3 of 5 ad sets, all of them, or only one.</p>
               </div>
               <button type="button" onClick={() => { clearImport(); setAds((current) => [...current, newAd(`Ad ${current.length + 1}`, adSetIds)]); }} className="pixel-button text-xs">
                 + Add ad
@@ -710,10 +812,10 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="pixel-label">Ad {adIndex + 1}</p>
-                      <h3 className="mt-1 text-2xl font-black">{ad.label || `Ad ${adIndex + 1}`}</h3>
+                      <h4 className="mt-1 text-2xl font-black">{ad.label || `Ad ${adIndex + 1}`}</h4>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => updateAd(ad.id, { assignedAdSetIds: adSetIds })} className="mini-button">All ad sets</button>
+                      <button type="button" onClick={() => updateAd(ad.id, { assignedAdSetIds: adSetIds })} className="mini-button">All</button>
                       <button type="button" onClick={() => updateAd(ad.id, { assignedAdSetIds: [] })} className="mini-button">None</button>
                       <button type="button" onClick={() => { clearImport(); setAds((current) => [...current, { ...ad, id: uid("ad"), label: `${ad.label || "Ad"} copy` }]); }} className="mini-button">Duplicate</button>
                       {ads.length > 1 ? <button type="button" onClick={() => { clearImport(); setAds((current) => current.filter((item) => item.id !== ad.id)); }} className="mini-button danger">Delete</button> : null}
@@ -757,12 +859,12 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
           </section>
         ) : null}
 
-        {step === 4 ? (
+        {slide === 11 ? (
           <section className="grid gap-5">
-            <div>
-              <p className="pixel-label">Step 4</p>
-              <h2 className="mt-2 text-3xl font-black">Funnel review</h2>
-              <p className="mt-2 text-sm font-semibold pixel-muted">Click a box to read it. This is the clean campaign shape before saving.</p>
+            <div className="text-center">
+              <p className="pixel-label">Review</p>
+              <h3 className="text-3xl font-black">Save the campaign folder draft.</h3>
+              <p className="helper-copy">Click a funnel box to inspect the details.</p>
             </div>
 
             <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
@@ -788,24 +890,21 @@ export function NewBriefForm({ initialBrief, briefId }: { initialBrief?: JDWCamp
             />
 
             {submitError ? <p className="pixel-alert p-3 text-sm font-bold">{submitError}</p> : null}
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <button type="button" onClick={() => setStep(3)} className="mini-button px-4 py-3">Back</button>
-              <button type="button" onClick={submitBrief} disabled={isPending} className="pixel-button px-6 py-4 text-sm disabled:opacity-60">
-                {isPending ? "Saving..." : briefId ? "Update brief" : importedJson ? "Submit imported JSON" : "Save draft"}
-              </button>
-            </div>
           </section>
         ) : null}
       </div>
 
-      {step < 4 ? (
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setStep((current) => Math.min(4, current + 1))} className="pixel-button px-6 py-4 text-sm">
-            Next
+      <div className="wizard-controls pixel-window p-4">
+        <button type="button" onClick={previousSlide} disabled={slide === 0} className="mini-button px-4 py-3 disabled:opacity-40">Back</button>
+        <button type="button" onClick={nextSlide} disabled={slide === SLIDES.length - 1} className="mini-button px-4 py-3 disabled:opacity-40">Skip</button>
+        {slide < SLIDES.length - 1 ? (
+          <button type="button" onClick={nextSlide} className="pixel-button px-6 py-4 text-sm">Next</button>
+        ) : (
+          <button type="button" onClick={submitBrief} disabled={isPending} className="pixel-button px-6 py-4 text-sm disabled:opacity-60">
+            {isPending ? "Saving..." : briefId ? "Update brief" : importedJson ? "Submit imported JSON" : "Save draft"}
           </button>
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }

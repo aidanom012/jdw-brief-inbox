@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArtistDesktop } from "@/components/ArtistDesktop";
 import { BriefCard } from "@/components/BriefCard";
 import { TopBar } from "@/components/TopBar";
 import { getBriefs, type BriefRow } from "@/lib/db";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 type InboxPageProps = {
   searchParams: {
     status?: string;
+    artist?: string;
   };
 };
 
@@ -18,14 +20,21 @@ const FILTERS: Array<{ label: string; status?: BriefStatus }> = [
   { label: "Completed", status: "done" }
 ];
 
+function matchesArtist(brief: BriefRow, artist: string): boolean {
+  return (brief.artist || "Unknown artist").trim().toLowerCase() === artist.trim().toLowerCase();
+}
+
 export default async function InboxPage({ searchParams }: InboxPageProps) {
   const role = requireUser();
   const activeStatus: BriefStatus = searchParams.status && isBriefStatus(searchParams.status) ? searchParams.status : "received";
+  const activeArtist = searchParams.artist?.trim() || "";
   let briefs: BriefRow[] = [];
+  let allBriefs: BriefRow[] = [];
   let errorMessage: string | null = null;
 
   try {
-    briefs = await getBriefs(activeStatus);
+    allBriefs = await getBriefs(activeStatus);
+    briefs = activeArtist ? allBriefs.filter((brief) => matchesArtist(brief, activeArtist)) : allBriefs;
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "Unable to load briefs.";
   }
@@ -37,9 +46,9 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         <div className="animate-rise flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="pixel-label">Campaign briefs</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight">Brief inbox</h1>
+            <h1 className="mt-2 text-4xl font-black tracking-tight">{activeArtist || "Brief inbox"}</h1>
             <p className="mt-3 text-sm font-semibold pixel-muted">
-              {STATUS_LABELS[activeStatus]} · one login · clean funnel view
+              {STATUS_LABELS[activeStatus]} · artist folders · clean funnel view
             </p>
           </div>
           <Link href="/new" className="pixel-button focus-ring px-5 py-4 text-sm">
@@ -47,9 +56,13 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
           </Link>
         </div>
 
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
+        <div className="mt-6 flex flex-wrap gap-2 pb-1">
+          <Link href="/" className="nav-chip focus-ring">Desktop</Link>
           {FILTERS.map((filter) => {
-            const href = filter.status === "received" ? "/inbox" : `/inbox?status=${filter.status}`;
+            const params = new URLSearchParams();
+            if (filter.status && filter.status !== "received") params.set("status", filter.status);
+            if (activeArtist) params.set("artist", activeArtist);
+            const href = params.toString() ? `/inbox?${params.toString()}` : "/inbox";
             const isActive = filter.status === activeStatus;
             return (
               <Link key={filter.label} href={href} className={`focus-ring whitespace-nowrap ${isActive ? "nav-chip nav-chip-active" : "nav-chip"}`}>
@@ -57,6 +70,9 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
               </Link>
             );
           })}
+          {activeArtist ? (
+            <Link href="/inbox" className="nav-chip focus-ring">All folders</Link>
+          ) : null}
         </div>
 
         {errorMessage ? (
@@ -65,15 +81,21 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
           </section>
         ) : null}
 
-        {!errorMessage && briefs.length === 0 ? (
+        {!errorMessage && !activeArtist ? (
+          <div className="mt-6">
+            <ArtistDesktop briefs={allBriefs} />
+          </div>
+        ) : null}
+
+        {!errorMessage && activeArtist && briefs.length === 0 ? (
           <section className="mt-8 pixel-window p-8 text-center">
-            <p className="pixel-label">Empty</p>
-            <h2 className="mt-2 text-2xl font-black">No briefs yet.</h2>
-            <p className="mt-2 font-semibold pixel-muted">Create one with the campaign → ad sets → ads flow.</p>
+            <p className="pixel-label">Empty folder</p>
+            <h2 className="mt-2 text-2xl font-black">No {STATUS_LABELS[activeStatus].toLowerCase()} briefs for this artist.</h2>
+            <p className="mt-2 font-semibold pixel-muted">Switch status or create a new brief.</p>
           </section>
         ) : null}
 
-        {briefs.length > 0 ? (
+        {activeArtist && briefs.length > 0 ? (
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {briefs.map((brief) => (
               <BriefCard key={brief.id} brief={brief} />
