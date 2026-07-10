@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 export type UserRole = "aidan" | "james";
 
 const COOKIE_NAME = "jdw_brief_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 const FULL_ACCESS_ROLE: UserRole = "aidan";
 
 function authSecret(): string {

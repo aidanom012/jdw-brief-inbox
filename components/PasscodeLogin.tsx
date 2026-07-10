@@ -14,10 +14,11 @@ export function PasscodeLogin({ showError }: PasscodeLoginProps) {
             {process.env.NEXT_PUBLIC_APP_NAME || "JDW Brief Builder"}
           </h1>
           <p className="mt-3 text-sm font-semibold leading-6 pixel-muted">
-            One passcode. No James/Aidan split. Once you are in, every page is unlocked.
+            One passcode. Full access. This device stays signed in so the builder opens like a private desktop.
           </p>
         </div>
         <form action={loginAction} className="space-y-4">
+          <input type="text" name="username" value="jdw-brief-builder" autoComplete="username" readOnly hidden />
           <label className="block">
             <span className="pixel-label">Passcode</span>
             <input name="passcode" type="password" autoComplete="current-password" className="field mt-2 font-mono" autoFocus />

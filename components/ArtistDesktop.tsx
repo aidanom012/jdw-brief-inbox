@@ -60,16 +60,15 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
             const projects = uniqueProjects(artistBriefs);
             const draftCount = artistBriefs.filter((brief) => brief.status !== "done").length;
             const completedCount = artistBriefs.length - draftCount;
-            const isCompletedFolder = artistBriefs.length > 0 && draftCount === 0;
             return (
               <div
                 key={artist}
-                className={`folder-shell desktop-folder ${isCompletedFolder ? "folder-shell-completed" : ""}`}
+                className="folder-shell desktop-folder"
                 style={{ "--folder-delay": `${Math.min(index, 20) * 22}ms` } as CSSProperties}
               >
                 <Link
                   href={`/inbox?artist=${encodeURIComponent(artist)}`}
-                  className={`folder-card focus-ring ${isCompletedFolder ? "folder-card-completed" : ""}`}
+                  className="folder-card focus-ring"
                   aria-label={`Open ${artist} folder`}
                 >
                   <span className="folder-icon" aria-hidden="true">
