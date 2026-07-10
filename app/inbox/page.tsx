@@ -67,7 +67,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                 <p>{STATUS_LABELS[activeStatus]} campaigns inside this folder.</p>
               </div>
               <div className="folder-campaign-actions">
-                <Link href="/" className="mini-button focus-ring">← Desktop</Link>
+                <Link href="/inbox" className="mini-button focus-ring">← Inbox</Link>
                 <Link href="/new" className="pixel-button focus-ring">+ New brief</Link>
               </div>
             </div>
