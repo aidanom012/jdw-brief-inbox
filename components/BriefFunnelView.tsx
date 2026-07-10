@@ -88,177 +88,213 @@ function nodeSummaryForPlatform(brief: JDWCampaignBrief): string {
   return [brief.campaign.objective, brief.campaign.campaign_type].filter(Boolean).join(" · ");
 }
 
+function DetailDrawer({ brief, details, allAds }: { brief: JDWCampaignBrief; details: ReturnType<typeof selectedDetails>; allAds: JDWAd[] }) {
+  if (details.kind === "campaign") {
+    return (
+      <div className="detail-drawer-content">
+        <div>
+          <p className="pixel-label">Campaign setup</p>
+          <h3>{value(brief.campaign.release_title, "Campaign setup")}</h3>
+        </div>
+        <div className="detail-grid">
+          <p><strong>Platform</strong><span>{value(brief.campaign.platform)}</span></p>
+          <p><strong>Account</strong><span>{value(brief.campaign.account, "No account yet")}</span></p>
+          <p><strong>ACID</strong><span>{value(brief.campaign.acid, "Missing")}</span></p>
+          <p><strong>Objective</strong><span>{value(brief.campaign.objective)}</span></p>
+          <p><strong>Budget</strong><span>{value(brief.budget.amount, "Missing")} {value(brief.budget.currency, "")}</span></p>
+          <p><strong>Territory</strong><span>{value(brief.campaign.territory_summary, "Unknown")}</span></p>
+        </div>
+        {brief.campaign.campaign_notes ? <p className="drawer-note">{brief.campaign.campaign_notes}</p> : null}
+      </div>
+    );
+  }
+
+  if (details.kind === "adset" && details.adSet) {
+    return (
+      <div className="detail-drawer-content">
+        <div>
+          <p className="pixel-label">Audience / ad set</p>
+          <h3>{value(details.adSet.label, "Untitled ad set")}</h3>
+        </div>
+        <div className="detail-grid">
+          <p><strong>Targeting</strong><span>{value(details.adSet.targeting_type, "unknown")}</span></p>
+          <p><strong>Budget</strong><span>{details.adSet.budget_amount ? `${details.adSet.budget_amount} ${value(details.adSet.budget_type, "")}` : "Campaign level"}</span></p>
+          <p><strong>Locations</strong><span>{details.adSet.locations.length ? details.adSet.locations.join(", ") : "In notes / TBC"}</span></p>
+          <p><strong>Placements</strong><span>{details.adSet.placements.length ? details.adSet.placements.join(", ") : "In notes / TBC"}</span></p>
+        </div>
+        <p className="drawer-note">{value(details.adSet.targeting_details || details.adSet.notes, "No targeting notes yet.")}</p>
+      </div>
+    );
+  }
+
+  if ((details.kind === "ad" || details.kind === "destination") && details.ad) {
+    return (
+      <div className="detail-drawer-content">
+        <div>
+          <p className="pixel-label">{details.kind === "destination" ? "Destination" : "Ad / asset"}</p>
+          <h3>{value(details.ad.label || details.ad.release_title, "Untitled ad")}</h3>
+        </div>
+        <div className="detail-grid">
+          <p><strong>Asset</strong><span>{value(details.ad.asset_type, "Unknown asset type")}</span></p>
+          <p><strong>Sent to</strong><span>{adSetsForAd(brief, details.ad).map((adSet) => value(adSet.label, "Untitled")).join(", ") || "Unknown"}</span></p>
+          <p><strong>Destination</strong><span>{value(details.ad.destination_url, "No destination link yet")}</span></p>
+          <p><strong>Copy</strong><span>{value(details.ad.copy, "No copy yet")}</span></p>
+        </div>
+        {details.ad.asset_links.length > 0 ? (
+          <div className="drawer-link-list">
+            {details.ad.asset_links.map((link) => <p key={link}>{link}</p>)}
+          </div>
+        ) : null}
+        {details.ad.notes ? <p className="drawer-note">{details.ad.notes}</p> : null}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function BriefFunnelView({ brief }: BriefFunnelViewProps) {
   const allAds = useMemo(() => allAdsForBrief(brief), [brief]);
   const [selected, setSelected] = useState<NodeSelection>({ type: "campaign", id: "campaign" });
   const details = selectedDetails(brief, selected, allAds);
   const platform = value(brief.campaign.platform, "Platform");
 
+  function choose(next: NodeSelection) {
+    setSelected(next);
+  }
+
   return (
-    <section className="pixel-window p-4 sm:p-6">
+    <section className="pixel-window funnel-section p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="pixel-label">Funnel map</p>
           <h2 className="mt-2 text-3xl font-black">{value(brief.campaign.artist, "Untitled campaign")}</h2>
           <p className="mt-1 max-w-3xl font-semibold pixel-muted">
-            Big spacious map. Click campaign, ad set, ad, or destination to inspect without showing every field at once.
+            Spacious build map. Click any block and its detail drawer opens underneath.
           </p>
         </div>
         <span className="pixel-flow-chip">{platform}</span>
       </div>
 
-      <div className="mt-5 grid gap-5 2xl:grid-cols-[1fr_380px]">
-        <div className="pixel-flow-canvas pixel-card p-4">
-          <div className="pixel-flow-inner">
-            <div className="pixel-flow-grid">
-              <div className="pixel-flow-heading pixel-label">Campaign / context</div>
-              <div className="pixel-flow-heading pixel-label">Audience / ad set</div>
-              <div className="pixel-flow-heading pixel-label">Content / ads</div>
-              <div className="pixel-flow-heading pixel-label">Destination</div>
-              <div className="pixel-flow-heading pixel-label">Outcome</div>
+      <div className="mt-5 pixel-flow-canvas pixel-card p-4">
+        <div className="pixel-flow-inner">
+          <div className="pixel-flow-grid">
+            <div className="pixel-flow-heading pixel-label">Campaign</div>
+            <div className="pixel-flow-heading pixel-label">Ad set / audience</div>
+            <div className="pixel-flow-heading pixel-label">Ad / asset</div>
+            <div className="pixel-flow-heading pixel-label">Destination</div>
+            <div className="pixel-flow-heading pixel-label">Result</div>
 
-              <div className="pixel-flow-cell first-col" style={{ gridRow: `2 / span ${Math.max(brief.ad_sets.length, 1)}` }}>
-                <button
-                  type="button"
-                  onClick={() => setSelected({ type: "campaign", id: "campaign" })}
-                  className={`pixel-node pixel-node-accent min-h-40 w-full p-5 text-left ${selected.type === "campaign" ? "pixel-node-active" : ""}`}
-                >
-                  <span className="pixel-label block">Campaign</span>
-                  <strong className="mt-3 block text-2xl leading-tight">{value(brief.campaign.artist)}</strong>
-                  <span className="mt-3 block text-sm font-black uppercase tracking-[0.08em]">
-                    {truncate(nodeSummaryForPlatform(brief), "Objective missing", 54)}
-                  </span>
-                  <span className="mt-3 block text-xs font-bold">ACID {value(brief.campaign.acid, "missing")}</span>
-                </button>
+            <div className="pixel-flow-cell first-col" style={{ gridRow: `2 / span ${Math.max(brief.ad_sets.length, 1)}` }}>
+              <button
+                type="button"
+                onClick={() => choose({ type: "campaign", id: "campaign" })}
+                className={`pixel-node min-h-44 w-full p-6 text-left ${selected.type === "campaign" ? "pixel-node-active" : ""}`}
+              >
+                <span className="pixel-label block">Campaign</span>
+                <strong className="mt-3 block text-2xl leading-tight">{value(brief.campaign.artist)}</strong>
+                <span className="mt-4 block text-sm font-black uppercase tracking-[0.08em]">
+                  {truncate(nodeSummaryForPlatform(brief), "Objective missing", 62)}
+                </span>
+                <span className="mt-4 inline-flex pixel-flow-chip">ACID {value(brief.campaign.acid, "missing")}</span>
+              </button>
+            </div>
+
+            {brief.ad_sets.length === 0 ? (
+              <div className="pixel-flow-cell">
+                <div className="pixel-node w-full p-6 text-left">
+                  <span className="pixel-label block">No ad sets yet</span>
+                  <strong className="mt-2 block text-lg">Add audience blocks in edit mode</strong>
+                </div>
               </div>
+            ) : null}
 
-              {brief.ad_sets.length === 0 ? (
-                <div className="pixel-flow-cell">
-                  <div className="pixel-node w-full p-5 text-left">
-                    <span className="pixel-label block">No ad sets yet</span>
-                    <strong className="mt-2 block text-lg">Add audience blocks in edit mode</strong>
+            {brief.ad_sets.map((adSet, adSetIndex) => {
+              const adsForSet = uniqueAdsForAdSet(brief, adSet, allAds);
+              const primaryAd = adsForSet[0];
+              const primaryAdIndex = primaryAd ? allAds.findIndex((ad) => sameAd(ad, primaryAd)) : -1;
+              const destination = primaryAd?.destination_url || null;
+
+              return (
+                <div key={`${adSet.label || "adset"}-${adSetIndex}`} className="contents">
+                  <div className="pixel-flow-cell">
+                    <button
+                      type="button"
+                      onClick={() => choose({ type: "adset", id: String(adSetIndex) })}
+                      className={`pixel-node min-h-32 w-full p-5 text-left ${selected.type === "adset" && selected.id === String(adSetIndex) ? "pixel-node-active" : ""}`}
+                    >
+                      <span className="pixel-label block">Ad set {adSetIndex + 1}</span>
+                      <strong className="mt-2 block text-xl leading-tight">{value(adSet.label, `Ad set ${adSetIndex + 1}`)}</strong>
+                      <span className="mt-4 block text-xs font-black uppercase tracking-[0.08em]">
+                        {adsForSet.length} ads assigned
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="pixel-flow-cell">
+                    {adsForSet.length > 1 ? <span className="pixel-flow-joiner" /> : null}
+                    <div className="grid w-full gap-4">
+                      {adsForSet.length === 0 ? (
+                        <div className="pixel-node w-full p-5 text-left">
+                          <span className="pixel-label block">No ads</span>
+                          <strong className="mt-2 block text-sm">Assign ads in edit mode</strong>
+                        </div>
+                      ) : null}
+                      {adsForSet.map((ad, index) => {
+                        const allAdIndex = allAds.findIndex((candidate) => sameAd(candidate, ad));
+                        const safeIndex = allAdIndex >= 0 ? allAdIndex : index;
+                        return (
+                          <button
+                            key={`${adKey(ad, index)}-${adSetIndex}`}
+                            type="button"
+                            onClick={() => choose({ type: "ad", id: String(safeIndex) })}
+                            className={`pixel-node p-5 text-left ${selected.type === "ad" && selected.id === String(safeIndex) ? "pixel-node-active" : ""}`}
+                          >
+                            <span className="pixel-label block">Ad</span>
+                            <strong className="mt-1 block text-lg leading-tight">{value(ad.label || ad.release_title, `Ad ${index + 1}`)}</strong>
+                            <span className="mt-3 inline-flex pixel-flow-chip">{value(ad.asset_type, "asset")}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pixel-flow-cell">
+                    <button
+                      type="button"
+                      disabled={!primaryAd}
+                      onClick={() => primaryAdIndex >= 0 && choose({ type: "destination", id: String(primaryAdIndex) })}
+                      className={`pixel-node min-h-28 w-full p-5 text-left disabled:cursor-not-allowed ${selected.type === "destination" && selected.id === String(primaryAdIndex) ? "pixel-node-active" : ""}`}
+                    >
+                      <span className="pixel-label block">Destination</span>
+                      <strong className="mt-2 block break-words text-sm leading-tight">
+                        {truncate(destination, "No destination yet", 72)}
+                      </strong>
+                    </button>
+                  </div>
+
+                  <div className="pixel-flow-cell">
+                    <div className="pixel-node pixel-node-soft min-h-28 w-full p-5 text-left">
+                      <span className="pixel-label block">Result</span>
+                      <strong className="mt-2 block text-base leading-tight">
+                        {brief.campaign.platform === "TikTok" ? "Views / Spark activity" : "Clicks / conversions / audience"}
+                      </strong>
+                    </div>
                   </div>
                 </div>
-              ) : null}
-
-              {brief.ad_sets.map((adSet, adSetIndex) => {
-                const adsForSet = uniqueAdsForAdSet(brief, adSet, allAds);
-                const primaryAd = adsForSet[0];
-                const primaryAdIndex = primaryAd ? allAds.findIndex((ad) => sameAd(ad, primaryAd)) : -1;
-                const destination = primaryAd?.destination_url || null;
-
-                return (
-                  <div key={`${adSet.label || "adset"}-${adSetIndex}`} className="contents">
-                    <div className="pixel-flow-cell">
-                      <button
-                        type="button"
-                        onClick={() => setSelected({ type: "adset", id: String(adSetIndex) })}
-                        className={`pixel-node min-h-28 w-full p-4 text-left ${selected.type === "adset" && selected.id === String(adSetIndex) ? "pixel-node-active" : ""}`}
-                      >
-                        <span className="pixel-label block">Ad set {adSetIndex + 1}</span>
-                        <strong className="mt-2 block text-xl leading-tight">{value(adSet.label, `Ad set ${adSetIndex + 1}`)}</strong>
-                        <span className="mt-3 block text-xs font-bold uppercase tracking-[0.08em]">
-                          {adsForSet.length} ads assigned
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="pixel-flow-cell">
-                      {adsForSet.length > 1 ? <span className="pixel-flow-joiner" /> : null}
-                      <div className="grid w-full gap-3">
-                        {adsForSet.length === 0 ? (
-                          <div className="pixel-node w-full p-4 text-left">
-                            <span className="pixel-label block">No ads</span>
-                            <strong className="mt-2 block text-sm">Assign ads in edit mode</strong>
-                          </div>
-                        ) : null}
-                        {adsForSet.map((ad, index) => {
-                          const allAdIndex = allAds.findIndex((candidate) => sameAd(candidate, ad));
-                          const safeIndex = allAdIndex >= 0 ? allAdIndex : index;
-                          return (
-                            <button
-                              key={`${adKey(ad, index)}-${adSetIndex}`}
-                              type="button"
-                              onClick={() => setSelected({ type: "ad", id: String(safeIndex) })}
-                              className={`pixel-node p-4 text-left ${selected.type === "ad" && selected.id === String(safeIndex) ? "pixel-node-active" : ""}`}
-                            >
-                              <span className="pixel-label block">Ad</span>
-                              <strong className="mt-1 block text-base leading-tight">{value(ad.label || ad.release_title, `Ad ${index + 1}`)}</strong>
-                              <span className="mt-2 inline-flex pixel-flow-chip">{value(ad.asset_type, "asset")}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="pixel-flow-cell">
-                      <button
-                        type="button"
-                        disabled={!primaryAd}
-                        onClick={() => primaryAdIndex >= 0 && setSelected({ type: "destination", id: String(primaryAdIndex) })}
-                        className={`pixel-node min-h-24 w-full p-4 text-left disabled:cursor-not-allowed ${selected.type === "destination" && selected.id === String(primaryAdIndex) ? "pixel-node-active" : ""}`}
-                      >
-                        <span className="pixel-label block">Destination</span>
-                        <strong className="mt-2 block break-words text-sm leading-tight">
-                          {truncate(destination, "No destination yet", 70)}
-                        </strong>
-                      </button>
-                    </div>
-
-                    <div className="pixel-flow-cell">
-                      <div className="pixel-node pixel-node-soft min-h-24 w-full p-4 text-left">
-                        <span className="pixel-label block">Result</span>
-                        <strong className="mt-2 block text-base leading-tight">
-                          {brief.campaign.platform === "TikTok" ? "Video views / spark activity" : "Clicks / conversions / audience pool"}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
         </div>
-
-        <aside className="pixel-detail-panel p-5">
-          <span className="pixel-label block">Selected info</span>
-          {details.kind === "campaign" ? (
-            <div className="mt-4 grid gap-3 text-sm font-semibold">
-              <h3 className="text-2xl font-black">{value(brief.campaign.release_title, "Campaign setup")}</h3>
-              <p><strong>Platform:</strong> {value(brief.campaign.platform)}</p>
-              <p><strong>Account:</strong> {value(brief.campaign.account, "No account yet")}</p>
-              <p><strong>ACID:</strong> {value(brief.campaign.acid, "Missing")}</p>
-              <p><strong>Budget:</strong> {value(brief.budget.amount, "Missing")} {value(brief.budget.currency, "")}</p>
-              <p><strong>Territory:</strong> {value(brief.campaign.territory_summary, "Unknown")}</p>
-              {brief.campaign.campaign_notes ? <p className="whitespace-pre-wrap border-t-[3px] border-black pt-3">{brief.campaign.campaign_notes}</p> : null}
-            </div>
-          ) : null}
-
-          {details.kind === "adset" && details.adSet ? (
-            <div className="mt-4 grid gap-3 text-sm font-semibold">
-              <h3 className="text-2xl font-black">{value(details.adSet.label, "Untitled ad set")}</h3>
-              <p className="whitespace-pre-wrap">{value(details.adSet.targeting_details || details.adSet.notes, "No targeting notes yet.")}</p>
-              <p><strong>Budget:</strong> {details.adSet.budget_amount ? `${details.adSet.budget_amount} ${value(details.adSet.budget_type, "")}` : "Campaign level"}</p>
-            </div>
-          ) : null}
-
-          {(details.kind === "ad" || details.kind === "destination") && details.ad ? (
-            <div className="mt-4 grid gap-3 text-sm font-semibold">
-              <h3 className="text-2xl font-black">{value(details.ad.label || details.ad.release_title, "Untitled ad")}</h3>
-              <p><strong>Asset:</strong> {value(details.ad.asset_type, "Unknown asset type")}</p>
-              <p className="whitespace-pre-wrap"><strong>Copy:</strong> {value(details.ad.copy, "No copy yet.")}</p>
-              <p className="break-words"><strong>Destination:</strong> {value(details.ad.destination_url, "No destination link yet.")}</p>
-              {details.ad.asset_links.length > 0 ? (
-                <div className="grid gap-1 border-t-[3px] border-black pt-3">
-                  {details.ad.asset_links.map((link) => <p key={link} className="break-words font-mono text-xs">{link}</p>)}
-                </div>
-              ) : null}
-              <p><strong>Sent to:</strong> {adSetsForAd(brief, details.ad).map((adSet) => value(adSet.label, "Untitled")).join(", ") || "ad assignment unknown"}</p>
-              {details.ad.notes ? <p>{details.ad.notes}</p> : null}
-            </div>
-          ) : null}
-        </aside>
       </div>
+
+      <aside className="pixel-detail-drawer mt-5 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b-3 border-black pb-3">
+          <span className="pixel-label">Detail drawer</span>
+          <span className="pixel-flow-chip">click blocks above to change this</span>
+        </div>
+        <DetailDrawer brief={brief} details={details} allAds={allAds} />
+      </aside>
     </section>
   );
 }

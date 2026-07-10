@@ -18,7 +18,8 @@ export function DeleteCampaignButton({ briefId, label = "Delete" }: DeleteCampai
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (!window.confirm("Delete this campaign brief permanently?")) return;
+        const typed = window.prompt("Permanent delete. Type DELETE to remove this campaign brief forever.");
+        if (typed !== "DELETE") return;
         startTransition(async () => {
           await deleteBriefFromListAction(briefId);
         });

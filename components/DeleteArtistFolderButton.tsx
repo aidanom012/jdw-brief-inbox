@@ -18,8 +18,10 @@ export function DeleteArtistFolderButton({ artist, count }: DeleteArtistFolderBu
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        const message = `Delete the ${artist} folder and all ${count} campaign brief${count === 1 ? "" : "s"} inside it? This cannot be undone.`;
-        if (!window.confirm(message)) return;
+        const typed = window.prompt(
+          `Permanent delete. This removes ${count} campaign brief${count === 1 ? "" : "s"}. Type the artist name exactly to delete folder: ${artist}`
+        );
+        if (typed !== artist) return;
         startTransition(async () => {
           await deleteArtistFolderAction(artist);
         });

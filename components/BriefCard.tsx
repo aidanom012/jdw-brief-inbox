@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { BriefRow } from "@/lib/db";
 import { DeleteCampaignButton } from "@/components/DeleteCampaignButton";
+import { DuplicateCampaignButton } from "@/components/DuplicateCampaignButton";
 import { StatusBadge } from "@/components/StatusBadge";
 
 type BriefCardProps = {
@@ -58,6 +59,7 @@ export function BriefCard({ brief }: BriefCardProps) {
           {isCompleted ? "completed" : `${brief.missing_required_fields.length} missing`}
         </span>
         <div className="flex flex-wrap gap-2">
+          <DuplicateCampaignButton briefId={brief.id} label="Duplicate" />
           <DeleteCampaignButton briefId={brief.id} label="Delete" />
           <Link href={`/brief/${brief.id}`} className="mini-button focus-ring">
             Open

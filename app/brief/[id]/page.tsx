@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BriefFunnelView } from "@/components/BriefFunnelView";
 import { DeleteBriefButton } from "@/components/DeleteBriefButton";
+import { DuplicateCampaignButton } from "@/components/DuplicateCampaignButton";
+import { ExportSummaryButton } from "@/components/ExportSummaryButton";
 import { InternalNotes } from "@/components/InternalNotes";
 import { RawJsonViewer } from "@/components/RawJsonViewer";
 import { StatusControl } from "@/components/StatusControl";
@@ -66,6 +68,8 @@ export default async function BriefPage({ params }: BriefPageProps) {
                 </div>
                 <div className="flex min-w-52 flex-wrap items-end justify-end gap-2">
                   <StatusControl briefId={brief.id} status={brief.status} />
+                  <ExportSummaryButton brief={brief} />
+                  <DuplicateCampaignButton briefId={brief.id} />
                   <Link href={`/brief/${brief.id}/edit`} className="mini-button focus-ring px-4 py-3">
                     Edit
                   </Link>

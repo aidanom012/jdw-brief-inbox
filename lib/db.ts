@@ -240,3 +240,62 @@ export async function deleteBriefsByArtist(artist: string): Promise<void> {
     throw error;
   }
 }
+
+export async function duplicateBrief(id: string): Promise<BriefRow> {
+  const supabase = getSupabaseAdmin();
+  const { data: existing, error: readError } = await supabase
+    .from("briefs")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (readError) {
+    throw readError;
+  }
+
+  const rawBrief = existing.raw_json as JDWCampaignBrief;
+  const copyBrief: JDWCampaignBrief = {
+    ...rawBrief,
+    campaign: {
+      ...rawBrief.campaign,
+      campaign_notes: [
+        rawBrief.campaign.campaign_notes,
+        `Duplicated from ${String(existing.title || "campaign brief")}`
+      ].filter(Boolean).join("\n") || null
+    },
+    source: rawBrief.source
+      ? {
+          ...rawBrief.source,
+          source_notes: [
+            ...(rawBrief.source.source_notes || []),
+            `Duplicated from ${String(existing.title || "campaign brief")}`
+          ]
+        }
+      : rawBrief.source
+  };
+
+  const { data, error } = await supabase
+    .from("briefs")
+    .insert({
+      title: `${titleForBrief(copyBrief)} copy`,
+      status: "received",
+      artist: copyBrief.campaign.artist,
+      release_title: copyBrief.campaign.release_title,
+      acid: copyBrief.campaign.acid,
+      platform: copyBrief.campaign.platform,
+      account: copyBrief.campaign.account,
+      objective: copyBrief.campaign.objective,
+      raw_json: copyBrief,
+      missing_required_fields: (existing.missing_required_fields as string[] | null) ?? [],
+      internal_notes: existing.internal_notes || "",
+      submitted_by: existing.submitted_by || "james"
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapBriefRow(data);
+}

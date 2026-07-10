@@ -7,6 +7,7 @@ import { validateBriefJson } from "@/lib/brief-schema";
 import {
   createBrief,
   deleteBrief,
+  duplicateBrief,
   deleteBriefsByArtist,
   updateBrief,
   updateBriefStatus,
@@ -176,6 +177,24 @@ export async function updateInternalNotesAction(briefId: string, internalNotes: 
   revalidatePath(`/brief/${briefId}`);
 }
 
+
+export async function duplicateBriefAction(briefId: string): Promise<SubmitBriefResult> {
+  assertSameOriginRequest();
+  requireUser();
+  assertUuid(briefId);
+
+  try {
+    const duplicated = await duplicateBrief(briefId);
+    revalidatePath("/");
+    revalidatePath("/inbox");
+    return { ok: true, id: duplicated.id, ids: [duplicated.id] };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unable to duplicate brief."
+    };
+  }
+}
 
 export async function deleteBriefFromListAction(briefId: string): Promise<void> {
   assertSameOriginRequest();

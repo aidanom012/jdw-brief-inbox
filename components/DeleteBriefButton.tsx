@@ -15,7 +15,8 @@ export function DeleteBriefButton({ briefId }: DeleteBriefButtonProps) {
       type="button"
       disabled={isPending}
       onClick={() => {
-        if (!window.confirm("Delete this brief?")) return;
+        const typed = window.prompt("Permanent delete. Type DELETE to remove this campaign brief forever.");
+        if (typed !== "DELETE") return;
         startTransition(async () => {
           await deleteBriefAction(briefId);
         });

@@ -33,6 +33,10 @@ function updatedLabel(briefs: BriefRow[]): string {
 }
 
 export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
+  const recentBriefs = [...briefs]
+    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
+    .slice(0, 5);
+
   const groups = Array.from(
     briefs.reduce((map, brief) => {
       const artist = folderName(brief.artist);
@@ -55,6 +59,28 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
           + Start new brief
         </Link>
       </div>
+
+
+      {recentBriefs.length > 0 ? (
+        <div className="mb-6 pixel-card p-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="pixel-label">Recent campaigns</p>
+              <h2 className="mt-1 text-2xl font-black">Quick open</h2>
+            </div>
+            <Link href="/inbox" className="mini-button focus-ring">View inbox</Link>
+          </div>
+          <div className="recent-campaigns-strip">
+            {recentBriefs.map((brief) => (
+              <Link key={brief.id} href={`/brief/${brief.id}`} className={`recent-campaign-chip focus-ring ${brief.status === "done" ? "recent-campaign-chip-done" : ""}`}>
+                <span className="pixel-label block">{brief.platform || "Campaign"}</span>
+                <strong>{brief.artist || "Unknown"}</strong>
+                <span>{brief.release_title || "No project"}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {groups.length === 0 ? (
         <div className="pixel-card p-8 text-center">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArtistDesktop } from "@/components/ArtistDesktop";
-import { BriefCard } from "@/components/BriefCard";
+import { BriefSearchList } from "@/components/BriefSearchList";
 import { TopBar } from "@/components/TopBar";
 import { getBriefs, type BriefRow } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -96,10 +96,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         ) : null}
 
         {activeArtist && briefs.length > 0 ? (
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            {briefs.map((brief) => (
-              <BriefCard key={brief.id} brief={brief} />
-            ))}
+          <div className="mt-6">
+            <BriefSearchList briefs={briefs} />
           </div>
         ) : null}
       </main>
