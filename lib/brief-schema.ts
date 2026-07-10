@@ -92,6 +92,7 @@ export const campaignBriefSchema = z
         artist: nullableString,
         release_title: nullableString,
         acid: nullableString,
+        asid: nullableString.optional(),
         platform: platformSchema,
         account: nullableString,
         objective: nullableString,
@@ -275,6 +276,7 @@ function normaliseBrief(brief: JDWCampaignBrief): JDWCampaignBrief {
     },
     campaign: {
       ...brief.campaign,
+      asid: brief.campaign.asid ?? null,
       campaign_notes: brief.campaign.campaign_notes ?? null
     },
     ad_sets: brief.ad_sets.map((adSet) => ({
@@ -299,37 +301,11 @@ function validatedBrief(brief: JDWCampaignBrief): ValidatedBrief {
   };
 }
 
-function stripDeprecatedAsid(value: unknown): unknown {
-  if (!value || typeof value !== "object") return value;
-
-  if (Array.isArray(value)) return value.map(stripDeprecatedAsid);
-
-  const record = value as Record<string, unknown>;
-  if (record.campaign && typeof record.campaign === "object" && !Array.isArray(record.campaign)) {
-    const deprecatedIdKey = `as${"id"}`;
-    const { [deprecatedIdKey]: _deprecatedId, ...campaignWithoutDeprecatedId } = record.campaign as Record<string, unknown>;
-    void _deprecatedId;
-    return {
-      ...record,
-      campaign: campaignWithoutDeprecatedId,
-    };
-  }
-
-  if (record.briefs && Array.isArray(record.briefs)) {
-    return {
-      ...record,
-      briefs: record.briefs.map(stripDeprecatedAsid),
-    };
-  }
-
-  return record;
-}
-
 export function validateBriefJson(rawJson: string): BriefValidationResult {
   let parsed: unknown;
 
   try {
-    parsed = stripDeprecatedAsid(normaliseVersionAliases(JSON.parse(rawJson)));
+    parsed = normaliseVersionAliases(JSON.parse(rawJson));
   } catch {
     return { ok: false, message: "Invalid JSON. Ask the AI parser to output JDW_CAMPAIGN_BRIEF_V1 JSON only." };
   }

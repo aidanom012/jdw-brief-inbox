@@ -54,4 +54,4 @@ The backend tries the configured model chain in order. The default is `openai/gp
 - No AI repair calls.
 - The model returns compact JSON, not the full app schema.
 - `GROQ_MAX_COMPLETION_TOKENS` defaults to `2048`.
-- Local regex extraction pre-detects ACID, links, boost codes, and budget hints before calling Groq.
+- Local regex extraction pre-detects ACID, ASID, links, boost codes, and budget hints before calling Groq.

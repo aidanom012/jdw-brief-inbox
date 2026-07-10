@@ -19,7 +19,7 @@ export function DeleteArtistFolderButton({ artist, count }: DeleteArtistFolderBu
         event.preventDefault();
         event.stopPropagation();
         const typed = window.prompt(
-          `Permanent delete. This removes ${count} campaign brief${count === 1 ? "" : "s"}. Type the artist name exactly to delete folder: ${artist}`
+          `Permanent delete. This removes ${count} campaign brief${count === 1 ? "" : "s"}. Type the artist name exactly to delete this artist workspace: ${artist}`
         );
         if (typed !== artist) return;
         startTransition(async () => {
@@ -27,8 +27,8 @@ export function DeleteArtistFolderButton({ artist, count }: DeleteArtistFolderBu
         });
       }}
       className="folder-delete focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-      aria-label={`Delete ${artist} folder`}
-      title={`Delete ${artist} folder`}
+      aria-label={`Delete ${artist} workspace`}
+      title={`Delete ${artist} workspace`}
     >
       {isPending ? "..." : "×"}
     </button>

@@ -62,9 +62,9 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
             </div>
             <div className="folder-campaign-header">
               <div>
-                <p className="pixel-label">Artist folder</p>
+                <p className="pixel-label">Artist workspace</p>
                 <h1>{activeArtist}</h1>
-                <p>{STATUS_LABELS[activeStatus]} campaigns inside this folder.</p>
+                <p>{STATUS_LABELS[activeStatus]} campaigns for this artist.</p>
               </div>
               <div className="folder-campaign-actions">
                 <Link href="/inbox" className="mini-button focus-ring">← Inbox</Link>
@@ -72,7 +72,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
               </div>
             </div>
 
-            <div className="folder-tabs" aria-label="Folder filters">
+            <div className="folder-tabs" aria-label="Campaign filters">
               {FILTERS.map((filter) => {
                 const params = new URLSearchParams();
                 if (filter.status && filter.status !== "received") params.set("status", filter.status);
@@ -89,7 +89,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
             {briefs.length === 0 ? (
               <div className="empty-desktop-panel mt-6 text-center">
-                <p className="pixel-label">Empty folder</p>
+                <p className="pixel-label">Empty workspace</p>
                 <h2>No {STATUS_LABELS[activeStatus].toLowerCase()} campaigns here.</h2>
                 <p>Switch status or create a new brief.</p>
               </div>

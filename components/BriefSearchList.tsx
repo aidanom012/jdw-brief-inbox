@@ -31,7 +31,7 @@ export function BriefSearchList({ briefs }: { briefs: BriefRow[] }) {
     <section className="grid gap-4">
       <div className="pixel-window p-4">
         <label>
-          <span className="pixel-label">Search this folder</span>
+          <span className="pixel-label">Search campaigns</span>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -46,7 +46,7 @@ export function BriefSearchList({ briefs }: { briefs: BriefRow[] }) {
       {filtered.length === 0 ? (
         <div className="pixel-card p-8 text-center">
           <p className="pixel-label">No match</p>
-          <h2 className="mt-2 text-2xl font-black">Nothing in this folder matches that search.</h2>
+          <h2 className="mt-2 text-2xl font-black">Nothing in this workspace matches that search.</h2>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">

@@ -211,7 +211,7 @@ export async function deleteArtistFolderAction(artist: string): Promise<void> {
   const cleanArtist = artist.trim();
 
   if (!cleanArtist || cleanArtist.length > 160) {
-    throw new Error("Invalid artist folder.");
+    throw new Error("Invalid artist workspace.");
   }
 
   await deleteBriefsByArtist(cleanArtist);

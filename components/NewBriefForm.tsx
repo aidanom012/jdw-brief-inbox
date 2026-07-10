@@ -7,7 +7,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { submitBriefAction, updateBriefAction } from "@/app/actions";
@@ -78,6 +78,7 @@ type CampaignSetup = {
   platform: Platform;
   account: string;
   acid: string;
+  asid: string;
   objective: string;
   campaign_type: string;
   conversion_location: string;
@@ -97,8 +98,6 @@ type NewBriefFormProps = {
   briefId?: string;
   savedArtists?: string[];
   savedProjects?: string[];
-  initialStart?: "choice" | "fresh";
-  resumeDraftId?: string | null;
 };
 
 type BuildMode = "choice" | "manual" | "ai";
@@ -110,23 +109,6 @@ type CampaignQueueItem = {
   slide: number;
   status: "pending" | "saved" | "skipped";
   savedId?: string;
-};
-
-type AutosaveSnapshot = {
-  setup?: Partial<CampaignSetup>;
-  adSets?: Partial<WizardAdSet>[];
-  ads?: Partial<WizardAd>[];
-  slide?: number;
-  buildMode?: BuildMode;
-  campaignQueue?: CampaignQueueItem[];
-  activeQueueId?: string | null;
-  updatedAt?: string;
-};
-
-type AutosaveContinueOption = {
-  id: string;
-  label: string;
-  meta: string;
 };
 
 type CampaignTemplateId = "meta_streaming" | "meta_views" | "tiktok_spark";
@@ -414,36 +396,6 @@ function numberOrNull(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function padDatePart(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function normaliseDateForInput(value: string | null | undefined): string {
-  const clean = (value || "").trim();
-  if (!clean) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-
-  const ukMatch = clean.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/);
-  if (!ukMatch) return "";
-
-  const day = Number(ukMatch[1]);
-  const month = Number(ukMatch[2]);
-  let year = Number(ukMatch[3]);
-  if (year < 100) year += 2000;
-
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return "";
-  }
-
-  return `${year}-${padDatePart(month)}-${padDatePart(day)}`;
-}
-
-
 function splitList(value: string): string[] {
   return value
     .split(/[\n,]+/)
@@ -484,43 +436,19 @@ function newAd(label = "", adSetIds: string[] = []): WizardAd {
   };
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function isPlainIndexedLabel(label: string | undefined, prefix: string): boolean {
-  const clean = (label || "").trim();
-  if (!clean) return true;
-  return new RegExp(`^${escapeRegex(prefix)}\\s+\\d+$`, "i").test(clean);
-}
-
-function nextSequentialLabel<T extends { label: string }>(items: T[], prefix: string): string {
-  const pattern = new RegExp(`^${escapeRegex(prefix)}\\s+(\\d+)$`, "i");
-  const highestExisting = items.reduce((highest, item) => {
-    const match = item.label.trim().match(pattern);
-    return match ? Math.max(highest, Number(match[1])) : highest;
-  }, 0);
-  return `${prefix} ${Math.max(highestExisting, items.length) + 1}`;
-}
-
-function duplicateLabel<T extends { label: string }>(items: T[], sourceLabel: string, prefix: string): string {
-  const clean = sourceLabel.trim();
-  return isPlainIndexedLabel(clean, prefix) ? nextSequentialLabel(items, prefix) : `${clean || prefix} copy`;
-}
-
-function duplicateAdSet(adSet: WizardAdSet, label: string): WizardAdSet {
+function duplicateAdSet(adSet: WizardAdSet): WizardAdSet {
   return {
     ...adSet,
     id: uid("adset"),
-    label,
+    label: `${adSet.label || "Ad set"} copy`,
   };
 }
 
-function duplicateAd(ad: WizardAd, label: string): WizardAd {
+function duplicateAd(ad: WizardAd): WizardAd {
   return {
     ...ad,
     id: uid("ad"),
-    label,
+    label: `${ad.label || "Ad"} copy`,
   };
 }
 
@@ -530,6 +458,7 @@ const EMPTY_SETUP: CampaignSetup = {
   platform: "",
   account: "",
   acid: "",
+  asid: "",
   objective: "",
   campaign_type: "",
   conversion_location: "",
@@ -605,6 +534,7 @@ function buildBrief(
       artist: blankToNull(setup.artist),
       release_title: blankToNull(setup.release_title),
       acid: blankToNull(setup.acid),
+      asid: blankToNull(setup.asid),
       platform: blankToEnum(setup.platform),
       account: blankToNull(setup.account),
       objective: blankToNull(setup.objective),
@@ -656,18 +586,6 @@ function FieldShell({
 
 function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`field ${props.className || ""}`} />;
-}
-
-function DateInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  const value = typeof props.value === "string" ? normaliseDateForInput(props.value) : "";
-  return (
-    <input
-      {...props}
-      type="date"
-      value={value}
-      className={`field date-field ${props.className || ""}`}
-    />
-  );
 }
 
 function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -808,6 +726,7 @@ function briefToBuilderState(brief?: JDWCampaignBrief): {
     platform: (brief.campaign.platform || "") as Platform,
     account: brief.campaign.account || "",
     acid: brief.campaign.acid || "",
+    asid: brief.campaign.asid || "",
     objective: brief.campaign.objective || "",
     campaign_type: brief.campaign.campaign_type || "",
     conversion_location: brief.campaign.conversion_location || "",
@@ -943,107 +862,6 @@ function restoreAd(ad: Partial<WizardAd>, index: number, adSetIds: string[]): Wi
   };
 }
 
-function safeSlide(value: unknown): number {
-  return typeof value === "number"
-    ? Math.max(0, Math.min(SLIDES.length - 1, value))
-    : 0;
-}
-
-function setupHasContent(setup?: Partial<CampaignSetup>): boolean {
-  if (!setup) return false;
-  return Object.entries(setup).some(([key, value]) => {
-    if (key === "currency" && value === "GBP") return false;
-    return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
-  });
-}
-
-function adSetHasContent(adSet: Partial<WizardAdSet>, index: number): boolean {
-  const defaultLabel = `Ad set ${index + 1}`;
-  return Object.entries(adSet).some(([key, value]) => {
-    if (key === "id" || key === "assignedAdSetIds") return false;
-    if (key === "label" && value === defaultLabel) return false;
-    if (key === "gender" && value === "all") return false;
-    if (key === "targeting_type" && value === "unknown") return false;
-    if (key === "asset_type" && value === "video") return false;
-    if (key === "budget_enabled" && value === false) return false;
-    return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
-  });
-}
-
-function adHasContent(ad: Partial<WizardAd>, index: number): boolean {
-  const defaultLabel = `Ad ${index + 1}`;
-  return Object.entries(ad).some(([key, value]) => {
-    if (key === "id" || key === "assignedAdSetIds") return false;
-    if (key === "label" && value === defaultLabel) return false;
-    if (key === "asset_type" && value === "video") return false;
-    return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
-  });
-}
-
-function normaliseAutosaveSnapshot(value: unknown): AutosaveSnapshot | null {
-  if (!value || typeof value !== "object") return null;
-  const snapshot = value as AutosaveSnapshot;
-  return {
-    setup: snapshot.setup,
-    adSets: Array.isArray(snapshot.adSets) ? snapshot.adSets : undefined,
-    ads: Array.isArray(snapshot.ads) ? snapshot.ads : undefined,
-    slide: safeSlide(snapshot.slide),
-    buildMode: snapshot.buildMode === "manual" || snapshot.buildMode === "ai" ? snapshot.buildMode : "manual",
-    campaignQueue: Array.isArray(snapshot.campaignQueue) ? snapshot.campaignQueue : undefined,
-    activeQueueId: snapshot.activeQueueId || null,
-    updatedAt: typeof snapshot.updatedAt === "string" ? snapshot.updatedAt : undefined,
-  };
-}
-
-function autosaveDraftLabel(setup?: { artist?: string | null; release_title?: string | null }, fallback = "Unfinished brief"): string {
-  const artist = setup?.artist?.trim();
-  const release = setup?.release_title?.trim();
-  if (artist && release) return `${artist} / ${release}`;
-  if (artist) return artist;
-  if (release) return release;
-  return fallback;
-}
-
-function autosaveDraftMeta(slide = 0, updatedAt?: string): string {
-  const step = `Step ${safeSlide(slide) + 1} of ${SLIDES.length}`;
-  if (!updatedAt) return step;
-  const date = new Date(updatedAt);
-  if (Number.isNaN(date.getTime())) return step;
-  return `${step} · ${date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
-}
-
-function autosaveContinueOptions(snapshot: AutosaveSnapshot | null): AutosaveContinueOption[] {
-  if (!snapshot) return [];
-
-  if (Array.isArray(snapshot.campaignQueue) && snapshot.campaignQueue.length > 0) {
-    const pendingQueue = snapshot.campaignQueue.filter((item) => item.status === "pending");
-    return pendingQueue.map((item, index) => ({
-      id: item.id,
-      label: item.label || autosaveDraftLabel(item.brief?.campaign, `Campaign ${index + 1}`),
-      meta: autosaveDraftMeta(item.slide, snapshot.updatedAt),
-    }));
-  }
-
-  if (!autosaveIsMeaningful(snapshot)) return [];
-  return [
-    {
-      id: "single-draft",
-      label: autosaveDraftLabel(snapshot.setup),
-      meta: autosaveDraftMeta(snapshot.slide, snapshot.updatedAt),
-    },
-  ];
-}
-
-function autosaveIsMeaningful(snapshot: AutosaveSnapshot): boolean {
-  if (Array.isArray(snapshot.campaignQueue) && snapshot.campaignQueue.length > 0) {
-    return snapshot.campaignQueue.some((item) => item.status === "pending");
-  }
-  if (setupHasContent(snapshot.setup)) return true;
-  if ((snapshot.adSets || []).some(adSetHasContent)) return true;
-  if ((snapshot.ads || []).some(adHasContent)) return true;
-  return safeSlide(snapshot.slide) > 0 || snapshot.buildMode === "ai";
-}
-
 function toggleAssignedAdSet(ad: WizardAd, adSetId: string): string[] {
   return ad.assignedAdSetIds.includes(adSetId)
     ? ad.assignedAdSetIds.filter((id) => id !== adSetId)
@@ -1064,36 +882,6 @@ function FunnelPreview({
     [setup, adSets, ads],
   );
   return <BriefFunnelView brief={previewBrief} />;
-}
-
-function BottomFunnelDrawer({
-  setup,
-  adSets,
-  ads,
-}: {
-  setup: CampaignSetup;
-  adSets: WizardAdSet[];
-  ads: WizardAd[];
-}) {
-  const terms = adSetUnit(setup.platform);
-
-  return (
-    <details className="bottom-funnel-drawer">
-      <summary>
-        <span className="bottom-funnel-copy">
-          <span className="pixel-label">Preview</span>
-          <strong>Expand live funnel</strong>
-          <small>Campaign → {terms.lowerPlural} → ads → destination.</small>
-        </span>
-        <span className="bottom-funnel-meta">
-          {adSets.length} {adSets.length === 1 ? terms.lower : terms.lowerPlural} · {ads.length} ad{ads.length === 1 ? "" : "s"}
-        </span>
-      </summary>
-      <div className="bottom-funnel-drawer-body">
-        <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
-      </div>
-    </details>
-  );
 }
 
 function SummaryStrip({
@@ -1145,7 +933,7 @@ function slideForMissingField(field: string): number {
   if (field.includes("artist")) return 0;
   if (field.includes("release_title")) return 1;
   if (field.includes("platform")) return 2;
-  if (field.includes("account") || field.includes("acid")) return 3;
+  if (field.includes("account") || field.includes("acid") || field.includes("asid")) return 3;
   if (field.includes("objective") || field.includes("campaign_type")) return 4;
   if (field.includes("conversion_location") || field.includes("optimisation_event") || field.includes("pixel")) return 5;
   if (field.includes("budget") || field.includes("start_date") || field.includes("end_date")) return 6;
@@ -1197,101 +985,6 @@ function sourceEvidenceRows(setup: CampaignSetup, adSets: WizardAdSet[], ads: Wi
     ["Audiences", adSets.length ? String(adSets.length) : ""],
     ["Ads", ads.length ? String(ads.length) : ""],
   ].filter(([, value]) => value);
-}
-
-type CriticalBuildWarning = {
-  field: string;
-  title: string;
-  detail: string;
-};
-
-function hasText(value: string | null | undefined): boolean {
-  return typeof value === "string" && value.trim().length > 0 && value.trim().toLowerCase() !== "unknown";
-}
-
-function containsAny(value: string | null | undefined, terms: string[]): boolean {
-  const clean = (value || "").toLowerCase();
-  return terms.some((term) => clean.includes(term));
-}
-
-function adHasCreative(ad: WizardAd): boolean {
-  return hasText(ad.asset_links) || hasText(ad.post_url) || hasText(ad.boost_code);
-}
-
-function criticalBuildWarnings(setup: CampaignSetup, adSets: WizardAdSet[], ads: WizardAd[]): CriticalBuildWarning[] {
-  const warnings: CriticalBuildWarning[] = [];
-  const add = (field: string, title: string, detail: string) => {
-    if (!warnings.some((warning) => warning.field === field)) warnings.push({ field, title, detail });
-  };
-
-  if (!hasText(setup.account)) add("campaign.account", "Ad account missing", "Pick the exact account before build.");
-  if (!hasText(setup.acid)) add("campaign.acid", "ACID missing", "This is the only campaign ID field.");
-  if (!setup.platform) add("campaign.platform", "Platform missing", "Meta, TikTok, YouTube, or Other.");
-  if (!hasText(setup.objective)) add("campaign.objective", "Objective missing", "Needed before choosing campaign setup.");
-  if (!hasText(setup.budget_amount) || !setup.budget_type || !setup.currency) {
-    add("budget.amount", "Budget incomplete", "Amount, type, and currency must be clear.");
-  }
-  if (!hasText(setup.start_date) || !hasText(setup.end_date)) {
-    add("campaign.start_date", "Dates missing", "Start and end date need confirming.");
-  }
-
-  const terms = adSetUnit(setup.platform);
-  if (adSets.length === 0) {
-    add("ad_sets", `${terms.singular} missing`, "At least one audience/ad group is needed.");
-  } else if (adSets.some((adSet) => !hasText(adSet.locations) && !hasText(adSet.notes))) {
-    add("ad_sets[0].targeting_details", `${terms.singular} details missing`, "Location/targeting notes need checking.");
-  }
-
-  if (ads.length === 0) {
-    add("ads", "Ads missing", "At least one ad/creative is needed.");
-  } else if (ads.some((ad) => !adHasCreative(ad))) {
-    add("ads[0].asset_links", "Creative missing", "Need asset link, post URL, or boost code.");
-  }
-
-  const looksLikeMetaConversion =
-    setup.platform === "Meta" &&
-    (containsAny(setup.objective, ["conversion", "stream", "sales"]) ||
-      containsAny(setup.campaign_type, ["conversion", "stream", "sales"]));
-
-  if (looksLikeMetaConversion) {
-    if (!hasText(setup.pixel)) add("campaign.pixel", "Pixel missing", "Meta conversion/streaming builds need the right pixel.");
-    if (!hasText(setup.optimisation_event)) add("campaign.optimisation_event", "Event missing", "Confirm ViewContent, FeatureFM_click, purchase, etc.");
-    if (ads.some((ad) => !hasText(ad.destination_url))) {
-      add("ads[0].destination_url", "Destination URL missing", "Conversion ads need a link to send people to.");
-    }
-  }
-
-  return warnings.slice(0, 6);
-}
-
-function LaunchBlockerPanel({
-  warnings,
-  onEditField,
-}: {
-  warnings: CriticalBuildWarning[];
-  onEditField: (field: string) => void;
-}) {
-  return (
-    <section className={`builder-side-card launch-blocker-card ${warnings.length === 0 ? "launch-blocker-card-ready" : ""}`}>
-      <div className="builder-side-card-heading">
-        <p className="pixel-label">Hey btw</p>
-        <span>{warnings.length ? `${warnings.length} blocker${warnings.length === 1 ? "" : "s"}` : "clear"}</span>
-      </div>
-      <h4>{warnings.length ? "Do not build until these are clear." : "Core build blockers are clear."}</h4>
-      {warnings.length ? (
-        <div className="launch-blocker-list">
-          {warnings.map((warning) => (
-            <button key={warning.field} type="button" onClick={() => onEditField(warning.field)}>
-              <strong>{warning.title}</strong>
-              <small>{warning.detail}</small>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p>The remaining checks are taste/review decisions, not obvious build blockers.</p>
-      )}
-    </section>
-  );
 }
 
 function MissingInfoCoach({
@@ -1878,7 +1571,6 @@ function BuilderInsightPanel({
 }) {
   const score = completionScore(missingFields);
   const evidenceCount = sourceEvidenceRows(setup, adSets, ads).length;
-  const blockers = criticalBuildWarnings(setup, adSets, ads);
 
   return (
     <aside className="builder-right-rail">
@@ -1893,7 +1585,7 @@ function BuilderInsightPanel({
         <p>{missingFields.length ? `${missingFields.length} items still need a decision.` : "Ready to save."}</p>
       </section>
 
-      <LaunchBlockerPanel warnings={blockers} onEditField={onEditMissing} />
+      <MissingInfoCoach missingFields={missingFields} onEditField={onEditMissing} />
 
       <BuilderRailDrawer eyebrow="Advanced tools" title="Smart templates" meta={setup.platform || "Tools"}>
         <CampaignTemplatePanel setup={setup} onApplyTemplate={onApplyTemplate} />
@@ -1903,21 +1595,18 @@ function BuilderInsightPanel({
         <SourceEvidencePanel setup={setup} adSets={adSets} ads={ads} />
       </BuilderRailDrawer>
 
+      <BuilderRailDrawer eyebrow="Preview" title="Live funnel" meta={`${adSets.length}:${ads.length}`} className="live-funnel-drawer">
+        <FunnelPreview setup={setup} adSets={adSets} ads={ads} />
+      </BuilderRailDrawer>
     </aside>
   );
 }
 
 function EntryChoiceScreen({
-  autosaveOptions,
   onManual,
-  onContinueDraft,
-  onDeleteDraft,
   onGenerated,
 }: {
-  autosaveOptions: AutosaveContinueOption[];
   onManual: () => void;
-  onContinueDraft: (id: string) => void;
-  onDeleteDraft: (id: string) => void;
   onGenerated: (
     json: string,
     validation: Extract<BriefValidationResult, { ok: true }>,
@@ -1930,51 +1619,19 @@ function EntryChoiceScreen({
         <p className="pixel-label">JDW build studio</p>
         <h1>Choose how to start.</h1>
         <p>
-          Fresh briefs now start completely blank. Autosave only appears as a Continue option when there is an unfinished draft.
+          Manual and AI are now separate. Both routes load into the same step-by-step Meta/TikTok walkthrough.
         </p>
       </section>
 
       <section className="entry-grid">
-        {autosaveOptions.length ? (
-          <article className="entry-card entry-card-continue">
-            <p className="pixel-label">Autosave</p>
-            <h2>Continue unfinished.</h2>
-            <p>
-              Pick this only if you actually want to carry on from a draft that was not saved yet. Saved briefs are removed from this list automatically.
-            </p>
-            <div className="autosave-option-list">
-              {autosaveOptions.map((option) => (
-                <div key={option.id} className="autosave-option-row">
-                  <button
-                    type="button"
-                    className="autosave-option-card"
-                    onClick={() => onContinueDraft(option.id)}
-                  >
-                    <span>{option.label}</span>
-                    <small>{option.meta}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className="autosave-option-delete"
-                    aria-label={`Delete ${option.label} autosave`}
-                    onClick={() => onDeleteDraft(option.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </article>
-        ) : null}
-
         <article className="entry-card entry-card-manual">
-          <p className="pixel-label">Fresh brief</p>
-          <h2>Create from scratch.</h2>
+          <p className="pixel-label">Manual build</p>
+          <h2>Start from blank fields.</h2>
           <p>
-            Clears any old local autosave and starts with empty fields. Use this when you are making a completely new brief.
+            Use this when you already know the settings or want to build without AI. It walks through campaign, tracking, audiences, ads, missing info, and review.
           </p>
           <button type="button" className="pixel-button mt-5" onClick={onManual}>
-            Create fresh brief
+            Start manual build
           </button>
         </article>
 
@@ -1998,8 +1655,6 @@ export function NewBriefForm({
   briefId,
   savedArtists = [],
   savedProjects = [],
-  initialStart = "choice",
-  resumeDraftId = null,
 }: NewBriefFormProps) {
   const router = useRouter();
   const initialState = useMemo(
@@ -2007,7 +1662,7 @@ export function NewBriefForm({
     [initialBrief],
   );
   const [slide, setSlide] = useState(0);
-  const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief || initialStart === "fresh" ? "manual" : "choice");
+  const [buildMode, setBuildMode] = useState<BuildMode>(briefId || initialBrief ? "manual" : "choice");
   const [setup, setSetup] = useState<CampaignSetup>(initialState.setup);
   const [adSets, setAdSets] = useState<WizardAdSet[]>(initialState.adSets);
   const [ads, setAds] = useState<WizardAd[]>(initialState.ads);
@@ -2024,9 +1679,6 @@ export function NewBriefForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isAutosaveLoaded, setIsAutosaveLoaded] = useState(Boolean(briefId || initialBrief));
   const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
-  const [autosaveSnapshot, setAutosaveSnapshot] = useState<AutosaveSnapshot | null>(null);
-  const autosaveSuppressedRef = useRef(false);
-  const routeActionAppliedRef = useRef(false);
   const [isPending, startTransition] = useTransition();
 
   const adSetIds = useMemo(() => adSets.map((adSet) => adSet.id), [adSets]);
@@ -2081,10 +1733,6 @@ export function NewBriefForm({
     ? queueDraftSnapshot.filter((item) => item.status === "pending").length
     : 0;
   const canDuplicatePreviousCampaign = hasCampaignQueue && activeQueueIndex > 0;
-  const continueOptions = useMemo(
-    () => autosaveContinueOptions(autosaveSnapshot),
-    [autosaveSnapshot],
-  );
 
   useEffect(() => {
     if (briefId || initialBrief) {
@@ -2095,63 +1743,48 @@ export function NewBriefForm({
     try {
       const saved = window.localStorage.getItem(AUTOSAVE_KEY);
       if (saved) {
-        const parsed = normaliseAutosaveSnapshot(JSON.parse(saved));
-        if (parsed && autosaveContinueOptions(parsed).length > 0) {
-          setAutosaveSnapshot(parsed);
-        } else {
-          window.localStorage.removeItem(AUTOSAVE_KEY);
+        const parsed = JSON.parse(saved) as {
+          setup?: CampaignSetup;
+          adSets?: WizardAdSet[];
+          ads?: WizardAd[];
+          slide?: number;
+          buildMode?: BuildMode;
+          campaignQueue?: CampaignQueueItem[];
+          activeQueueId?: string | null;
+        };
+        if (parsed.setup) setSetup({ ...EMPTY_SETUP, ...parsed.setup });
+        if (Array.isArray(parsed.adSets) && parsed.adSets.length > 0) {
+          const restoredAdSets = parsed.adSets.map(restoreAdSet);
+          const restoredAdSetIds = restoredAdSets.map((adSet) => adSet.id);
+          setAdSets(restoredAdSets);
+          if (Array.isArray(parsed.ads) && parsed.ads.length > 0) {
+            setAds(parsed.ads.map((ad, index) => restoreAd(ad, index, restoredAdSetIds)));
+          }
+        } else if (Array.isArray(parsed.ads) && parsed.ads.length > 0) {
+          setAds(parsed.ads.map((ad, index) => restoreAd(ad, index, adSetIds)));
         }
+        if (typeof parsed.slide === "number") setSlide(Math.max(0, Math.min(SLIDES.length - 1, parsed.slide)));
+        if (parsed.buildMode === "manual" || parsed.buildMode === "ai") setBuildMode(parsed.buildMode);
+        if (Array.isArray(parsed.campaignQueue) && parsed.campaignQueue.length > 0) {
+          setCampaignQueue(parsed.campaignQueue.map((item) => ({
+            ...item,
+            status: item.status === "saved" || item.status === "skipped" ? item.status : "pending",
+          })));
+          setActiveQueueId(parsed.activeQueueId || parsed.campaignQueue[0]?.id || null);
+        }
+        setAutosaveMessage("Autosave restored");
       }
     } catch {
       window.localStorage.removeItem(AUTOSAVE_KEY);
-      setAutosaveSnapshot(null);
     } finally {
       setIsAutosaveLoaded(true);
     }
   }, [briefId, initialBrief]);
 
   useEffect(() => {
-    if (briefId || initialBrief || !isAutosaveLoaded || routeActionAppliedRef.current) return;
-
-    if (initialStart === "fresh") {
-      routeActionAppliedRef.current = true;
-      startManualBuild();
-      return;
-    }
-
-    if (resumeDraftId) {
-      routeActionAppliedRef.current = true;
-      if (autosaveSnapshot && autosaveContinueOptions(autosaveSnapshot).some((option) => option.id === resumeDraftId)) {
-        continueAutosaveDraft(resumeDraftId);
-      } else {
-        setBuildMode("choice");
-        setAutosaveMessage("No unfinished autosave found");
-      }
-    }
-  }, [briefId, initialBrief, isAutosaveLoaded, initialStart, resumeDraftId, autosaveSnapshot]);
-
-  useEffect(() => {
-    if (!isAutosaveLoaded || briefId || initialBrief || buildMode === "choice" || autosaveSuppressedRef.current) return;
+    if (!isAutosaveLoaded || briefId || initialBrief) return;
     const timeout = window.setTimeout(() => {
-      const nextSnapshot: AutosaveSnapshot = {
-        setup,
-        adSets,
-        ads,
-        slide,
-        buildMode,
-        campaignQueue,
-        activeQueueId,
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (!autosaveIsMeaningful(nextSnapshot)) {
-        window.localStorage.removeItem(AUTOSAVE_KEY);
-        setAutosaveSnapshot(null);
-        return;
-      }
-
-      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(nextSnapshot));
-      setAutosaveSnapshot(nextSnapshot);
+      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ setup, adSets, ads, slide, buildMode, campaignQueue, activeQueueId }));
       setAutosaveMessage("Autosaved");
     }, 450);
     return () => window.clearTimeout(timeout);
@@ -2159,100 +1792,7 @@ export function NewBriefForm({
 
   function clearAutosave() {
     window.localStorage.removeItem(AUTOSAVE_KEY);
-    setAutosaveSnapshot(null);
     setAutosaveMessage("Autosave cleared");
-  }
-
-  function deleteAutosaveDraft(id: string) {
-    if (!autosaveSnapshot) return;
-
-    if (Array.isArray(autosaveSnapshot.campaignQueue) && autosaveSnapshot.campaignQueue.length > 0) {
-      const nextSnapshot: AutosaveSnapshot = {
-        ...autosaveSnapshot,
-        campaignQueue: autosaveSnapshot.campaignQueue.filter((item) => item.id !== id),
-        activeQueueId: autosaveSnapshot.activeQueueId === id ? null : autosaveSnapshot.activeQueueId,
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (autosaveContinueOptions(nextSnapshot).length === 0) {
-        clearAutosave();
-        return;
-      }
-
-      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(nextSnapshot));
-      setAutosaveSnapshot(nextSnapshot);
-      setAutosaveMessage("Unfinished draft deleted");
-      return;
-    }
-
-    clearAutosave();
-  }
-
-  function resetBuilderToBlank() {
-    const blank = briefToBuilderState();
-    setSetup(blank.setup);
-    setAdSets(blank.adSets);
-    setAds(blank.ads);
-    setSameAdSetNotes("");
-    setSameBudgetEnabled(false);
-    setSameBudgetAmount("");
-    setSameBudgetType("");
-    setImportedJson(null);
-    setImportedValidation(null);
-    setCampaignQueue([]);
-    setActiveQueueId(null);
-    setSubmitError(null);
-    setSlide(0);
-  }
-
-  function restoreSingleAutosaveDraft(snapshot: AutosaveSnapshot) {
-    const restoredAdSets =
-      Array.isArray(snapshot.adSets) && snapshot.adSets.length > 0
-        ? snapshot.adSets.map(restoreAdSet)
-        : briefToBuilderState().adSets;
-    const restoredAdSetIds = restoredAdSets.map((adSet) => adSet.id);
-    const restoredAds =
-      Array.isArray(snapshot.ads) && snapshot.ads.length > 0
-        ? snapshot.ads.map((ad, index) => restoreAd(ad, index, restoredAdSetIds))
-        : [newAd("Ad 1", restoredAdSetIds)];
-
-    setSetup({ ...EMPTY_SETUP, ...(snapshot.setup || {}) });
-    setAdSets(restoredAdSets);
-    setAds(restoredAds);
-    setCampaignQueue([]);
-    setActiveQueueId(null);
-    setImportedJson(null);
-    setImportedValidation(null);
-    setSubmitError(null);
-    setSlide(safeSlide(snapshot.slide));
-    setBuildMode(snapshot.buildMode === "ai" ? "ai" : "manual");
-    setAutosaveMessage("Unfinished draft restored");
-    scrollBuilderToTop();
-  }
-
-  function continueAutosaveDraft(id: string) {
-    if (!autosaveSnapshot) return;
-
-    const queue: CampaignQueueItem[] = (autosaveSnapshot.campaignQueue || []).map((item) => ({
-      ...item,
-      status: (item.status === "saved" || item.status === "skipped" ? item.status : "pending") as CampaignQueueItem["status"],
-      slide: safeSlide(item.slide),
-    }));
-    const pendingQueue = queue.filter((item) => item.status === "pending");
-
-    if (pendingQueue.length > 0) {
-      const target = pendingQueue.find((item) => item.id === id) || pendingQueue[0];
-      setCampaignQueue(queue);
-      setActiveQueueId(target.id);
-      loadBriefIntoBuilder(target.brief);
-      setSlide(target.slide || 0);
-      setBuildMode("ai");
-      setAutosaveMessage(`Restored ${target.label}`);
-      scrollBuilderToTop();
-      return;
-    }
-
-    restoreSingleAutosaveDraft(autosaveSnapshot);
   }
 
   function clearImport() {
@@ -2421,13 +1961,11 @@ export function NewBriefForm({
           ].find((item) => item.id !== activeIdBeforeSave && item.status === "pending")
         : undefined;
 
-    autosaveSuppressedRef.current = true;
     startTransition(async () => {
       const result = briefId
         ? await updateBriefAction(briefId, jsonToSubmit)
         : await submitBriefAction(jsonToSubmit);
       if (!result.ok) {
-        autosaveSuppressedRef.current = false;
         setSubmitError(result.message);
         return;
       }
@@ -2449,7 +1987,6 @@ export function NewBriefForm({
         );
 
         if (nextQueuedItem) {
-          autosaveSuppressedRef.current = false;
           setActiveQueueId(nextQueuedItem.id);
           loadBriefIntoBuilder(nextQueuedItem.brief);
           setSlide(nextQueuedItem.slide || 0);
@@ -2459,15 +1996,11 @@ export function NewBriefForm({
         }
 
         window.localStorage.removeItem(AUTOSAVE_KEY);
-        setAutosaveSnapshot(null);
         router.push("/inbox");
         return;
       }
 
-      if (!briefId) {
-        window.localStorage.removeItem(AUTOSAVE_KEY);
-        setAutosaveSnapshot(null);
-      }
+      if (!briefId) window.localStorage.removeItem(AUTOSAVE_KEY);
       router.push(result.ids.length === 1 ? `/brief/${result.id}` : "/inbox");
     });
   }
@@ -2485,11 +2018,9 @@ export function NewBriefForm({
       return;
     }
 
-    autosaveSuppressedRef.current = true;
     startTransition(async () => {
       const result = await submitBriefAction(buildBatchJson(completeItems.map((item) => item.brief)));
       if (!result.ok) {
-        autosaveSuppressedRef.current = false;
         setSubmitError(result.message);
         return;
       }
@@ -2511,7 +2042,6 @@ export function NewBriefForm({
       setCampaignQueue(nextQueue);
 
       if (nextPending) {
-        autosaveSuppressedRef.current = false;
         setActiveQueueId(nextPending.id);
         loadBriefIntoBuilder(nextPending.brief);
         setSlide(nextPending.slide || 0);
@@ -2521,7 +2051,6 @@ export function NewBriefForm({
       }
 
       window.localStorage.removeItem(AUTOSAVE_KEY);
-      setAutosaveSnapshot(null);
       router.push("/inbox");
     });
   }
@@ -2545,7 +2074,6 @@ export function NewBriefForm({
     }
 
     window.localStorage.removeItem(AUTOSAVE_KEY);
-    setAutosaveSnapshot(null);
     router.push("/inbox");
   }
 
@@ -2628,28 +2156,17 @@ export function NewBriefForm({
   }
 
   function startManualBuild() {
-    autosaveSuppressedRef.current = false;
-    window.localStorage.removeItem(AUTOSAVE_KEY);
-    setAutosaveSnapshot(null);
-    resetBuilderToBlank();
+    clearImport();
+    setCampaignQueue([]);
+    setActiveQueueId(null);
     setBuildMode("manual");
-    setAutosaveMessage("Fresh brief started");
+    setSlide(0);
+    setSubmitError(null);
     scrollBuilderToTop();
   }
 
   function backToStartChoice() {
     persistActiveQueueDraft();
-    const snapshot: AutosaveSnapshot = {
-      setup,
-      adSets,
-      ads,
-      slide,
-      buildMode,
-      campaignQueue: queueDraftSnapshot,
-      activeQueueId,
-      updatedAt: new Date().toISOString(),
-    };
-    if (autosaveIsMeaningful(snapshot)) setAutosaveSnapshot(snapshot);
     setBuildMode("choice");
     setSubmitError(null);
   }
@@ -2692,10 +2209,7 @@ export function NewBriefForm({
   if (buildMode === "choice" && !briefId && !initialBrief) {
     return (
       <EntryChoiceScreen
-        autosaveOptions={continueOptions}
         onManual={startManualBuild}
-        onContinueDraft={continueAutosaveDraft}
-        onDeleteDraft={deleteAutosaveDraft}
         onGenerated={(json, validation, message) =>
           applyValidatedJson(json, validation, message)
         }
@@ -2772,7 +2286,7 @@ export function NewBriefForm({
           {currentPlaybookGuide ? <AdvancedGuidanceDrawer guide={currentPlaybookGuide} /> : null}
           {slide === 0 ? (
             <section className="simple-question">
-              <p className="pixel-label">Artist folder</p>
+              <p className="pixel-label">Artist workspace</p>
               <h3>Who is the artist?</h3>
               <TextInput
                 list="saved-artists"
@@ -2784,7 +2298,7 @@ export function NewBriefForm({
               <DataList id="saved-artists" options={savedArtists} />
               <p className="helper-copy">
                 If this artist already exists, pick it from the dropdown and the
-                brief will live in that artist folder.
+                brief will live in that artist workspace.
               </p>
             </section>
           ) : null}
@@ -2804,7 +2318,7 @@ export function NewBriefForm({
               />
               <DataList id="saved-projects" options={savedProjects} />
               <p className="helper-copy">
-                This becomes the project name inside the artist folder.
+                This becomes the project name inside the artist workspace.
               </p>
             </section>
           ) : null}
@@ -2834,7 +2348,7 @@ export function NewBriefForm({
             <section className="simple-question">
               <p className="pixel-label">Account + ACID</p>
               <h3>What account and ACID?</h3>
-              <div className="mx-auto mt-6 grid max-w-3xl gap-4 md:grid-cols-2">
+              <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
                 <FieldShell label="Account">
                   <TextInput
                     value={setup.account}
@@ -2849,9 +2363,16 @@ export function NewBriefForm({
                     placeholder="80JPUI"
                   />
                 </FieldShell>
+                <FieldShell label="ASID">
+                  <TextInput
+                    value={setup.asid}
+                    onChange={(e) => updateSetup("asid", e.target.value)}
+                    placeholder="ASID if supplied"
+                  />
+                </FieldShell>
               </div>
               <p className="helper-copy">
-                If James has not given ACID yet, hit Skip.
+                If James has not given ACID or ASID yet, hit Skip.
               </p>
             </section>
           ) : null}
@@ -2984,15 +2505,21 @@ export function NewBriefForm({
                   </SelectInput>
                 </FieldShell>
                 <FieldShell label="Start date">
-                  <DateInput
+                  <TextInput
+                    type="text"
+                    inputMode="numeric"
                     value={setup.start_date}
                     onChange={(e) => updateSetup("start_date", e.target.value)}
+                    placeholder="18/07/2026"
                   />
                 </FieldShell>
                 <FieldShell label="End date">
-                  <DateInput
+                  <TextInput
+                    type="text"
+                    inputMode="numeric"
                     value={setup.end_date}
                     onChange={(e) => updateSetup("end_date", e.target.value)}
+                    placeholder="21/07/2026"
                   />
                 </FieldShell>
                 <FieldShell label="Territory summary">
@@ -3140,7 +2667,7 @@ export function NewBriefForm({
                             clearImport();
                             setAdSets((current) => [
                               ...current,
-                              duplicateAdSet(adSet, duplicateLabel(current, adSet.label, adSetTerms.singular)),
+                              duplicateAdSet(adSet),
                             ]);
                           }}
                           className="mini-button"
@@ -3356,7 +2883,7 @@ export function NewBriefForm({
                     clearImport();
                     setAds((current) => [
                       ...current,
-                      newAd(nextSequentialLabel(current, "Ad"), adSetIds),
+                      newAd(`Ad ${current.length + 1}`, adSetIds),
                     ]);
                   }}
                   className="pixel-button text-xs"
@@ -3400,7 +2927,7 @@ export function NewBriefForm({
                             clearImport();
                             setAds((current) => [
                               ...current,
-                              duplicateAd(ad, duplicateLabel(current, ad.label, "Ad")),
+                              duplicateAd(ad),
                             ]);
                           }}
                           className="mini-button"
@@ -3554,7 +3081,7 @@ export function NewBriefForm({
               <div className="text-center">
                 <p className="pixel-label">Review</p>
                 <h3 className="text-3xl font-black">
-                  Save the campaign folder draft.
+                  Save the campaign draft.
                 </h3>
                 <p className="helper-copy">
                   Click a funnel box to inspect the details.
@@ -3611,10 +3138,6 @@ export function NewBriefForm({
           ) : null}
             </div>
           </div>
-
-          {slide === 11 ? null : (
-            <BottomFunnelDrawer setup={setup} adSets={adSets} ads={ads} />
-          )}
         </main>
 
         <BuilderInsightPanel
