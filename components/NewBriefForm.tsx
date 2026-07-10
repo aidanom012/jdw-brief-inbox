@@ -89,6 +89,15 @@ type NewBriefFormProps = {
 
 type BuildMode = "choice" | "manual" | "ai";
 
+type CampaignQueueItem = {
+  id: string;
+  brief: JDWCampaignBrief;
+  label: string;
+  slide: number;
+  status: "pending" | "saved";
+  savedId?: string;
+};
+
 const PLATFORM_OPTIONS = ["Meta", "TikTok", "YouTube", "Other"] as const;
 const CURRENCY_OPTIONS = [
   "GBP",
@@ -309,6 +318,24 @@ function playbookGuide(slide: number, platform: Platform): PlaybookGuide | null 
 
 function uid(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function queueLabelForBrief(brief: JDWCampaignBrief, index: number): string {
+  return (
+    [brief.campaign.artist, brief.campaign.release_title, brief.campaign.platform]
+      .filter(Boolean)
+      .join(" / ") || `Campaign ${index + 1}`
+  );
+}
+
+function makeCampaignQueue(briefs: JDWCampaignBrief[]): CampaignQueueItem[] {
+  return briefs.map((brief, index) => ({
+    id: uid("queued"),
+    brief,
+    label: queueLabelForBrief(brief, index),
+    slide: 0,
+    status: "pending" as const,
+  }));
 }
 
 function blankToNull(value: string | undefined): string | null {
@@ -1035,6 +1062,8 @@ function WizardControls({
   isPending,
   briefId,
   importedJson,
+  queueTotal = 0,
+  hasNextQueuedCampaign = false,
 }: {
   slide: number;
   onBack: () => void;
@@ -1044,7 +1073,21 @@ function WizardControls({
   isPending: boolean;
   briefId?: string;
   importedJson: string | null;
+  queueTotal?: number;
+  hasNextQueuedCampaign?: boolean;
 }) {
+  const saveLabel = isPending
+    ? "Saving..."
+    : queueTotal > 1 && hasNextQueuedCampaign
+      ? "Save & next campaign"
+      : queueTotal > 1
+        ? "Save final campaign"
+        : briefId
+          ? "Update brief"
+          : importedJson
+            ? "Submit imported JSON"
+            : "Save draft";
+
   return (
     <div className="wizard-controls wizard-controls-inline">
       <button
@@ -1078,13 +1121,7 @@ function WizardControls({
           disabled={isPending}
           className="pixel-button px-6 py-4 text-sm disabled:opacity-60"
         >
-          {isPending
-            ? "Saving..."
-            : briefId
-              ? "Update brief"
-              : importedJson
-                ? "Submit imported JSON"
-                : "Save draft"}
+          {saveLabel}
         </button>
       )}
     </div>
@@ -1113,6 +1150,55 @@ function BuilderModeBanner({
       <button type="button" className="mini-button" onClick={onBackToStart}>
         Change path
       </button>
+    </section>
+  );
+}
+
+function CampaignQueueBar({
+  queue,
+  activeId,
+  onSelect,
+}: {
+  queue: CampaignQueueItem[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  if (queue.length <= 1) return null;
+
+  const activeIndex = queue.findIndex((item) => item.id === activeId);
+  const savedCount = queue.filter((item) => item.status === "saved").length;
+
+  return (
+    <section className="campaign-queue-bar">
+      <div className="campaign-queue-heading">
+        <div>
+          <p className="pixel-label">AI campaign queue</p>
+          <h2>Campaign {Math.max(0, activeIndex) + 1} of {queue.length}</h2>
+        </div>
+        <span className="campaign-queue-count">{savedCount}/{queue.length} saved</span>
+      </div>
+      <div className="campaign-queue-list" role="tablist" aria-label="AI imported campaigns">
+        {queue.map((item, index) => {
+          const isActive = item.id === activeId;
+          const isSaved = item.status === "saved";
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              disabled={isSaved}
+              className={`campaign-queue-chip ${isActive ? "campaign-queue-chip-active" : ""} ${isSaved ? "campaign-queue-chip-saved" : ""}`}
+            >
+              <span className="campaign-queue-number">{index + 1}</span>
+              <span className="campaign-queue-name">{item.label}</span>
+              <span className="campaign-queue-status">{isSaved ? "saved" : isActive ? "editing" : "pending"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="campaign-queue-note">
+        Switch between pending campaigns anytime. Your current edits are kept in the queue. Saving moves to the next pending campaign.
+      </p>
     </section>
   );
 }
@@ -1190,6 +1276,8 @@ export function NewBriefForm({
   const [importedJson, setImportedJson] = useState<string | null>(null);
   const [importedValidation, setImportedValidation] =
     useState<BriefValidationResult | null>(null);
+  const [campaignQueue, setCampaignQueue] = useState<CampaignQueueItem[]>([]);
+  const [activeQueueId, setActiveQueueId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isAutosaveLoaded, setIsAutosaveLoaded] = useState(Boolean(briefId || initialBrief));
   const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
@@ -1220,6 +1308,12 @@ export function NewBriefForm({
   const currentSlideHint = slideHintForPlatform(slide, setup.platform);
   const currentPlaybookGuide = playbookGuide(slide, setup.platform);
   const adSetTerms = adSetUnit(setup.platform);
+  const activeQueueIndex = campaignQueue.findIndex((item) => item.id === activeQueueId);
+  const queueTotal = campaignQueue.length;
+  const hasCampaignQueue = queueTotal > 1 && activeQueueIndex >= 0;
+  const hasNextQueuedCampaign = hasCampaignQueue
+    ? campaignQueue.some((item) => item.id !== activeQueueId && item.status !== "saved")
+    : false;
 
   useEffect(() => {
     if (briefId || initialBrief) {
@@ -1235,6 +1329,9 @@ export function NewBriefForm({
           adSets?: WizardAdSet[];
           ads?: WizardAd[];
           slide?: number;
+          buildMode?: BuildMode;
+          campaignQueue?: CampaignQueueItem[];
+          activeQueueId?: string | null;
         };
         if (parsed.setup) setSetup({ ...EMPTY_SETUP, ...parsed.setup });
         if (Array.isArray(parsed.adSets) && parsed.adSets.length > 0) {
@@ -1248,6 +1345,11 @@ export function NewBriefForm({
           setAds(parsed.ads.map((ad, index) => restoreAd(ad, index, adSetIds)));
         }
         if (typeof parsed.slide === "number") setSlide(Math.max(0, Math.min(SLIDES.length - 1, parsed.slide)));
+        if (parsed.buildMode === "manual" || parsed.buildMode === "ai") setBuildMode(parsed.buildMode);
+        if (Array.isArray(parsed.campaignQueue) && parsed.campaignQueue.length > 0) {
+          setCampaignQueue(parsed.campaignQueue);
+          setActiveQueueId(parsed.activeQueueId || parsed.campaignQueue[0]?.id || null);
+        }
         setAutosaveMessage("Autosave restored");
       }
     } catch {
@@ -1260,11 +1362,11 @@ export function NewBriefForm({
   useEffect(() => {
     if (!isAutosaveLoaded || briefId || initialBrief) return;
     const timeout = window.setTimeout(() => {
-      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ setup, adSets, ads, slide }));
+      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ setup, adSets, ads, slide, buildMode, campaignQueue, activeQueueId }));
       setAutosaveMessage("Autosaved");
     }, 450);
     return () => window.clearTimeout(timeout);
-  }, [setup, adSets, ads, slide, isAutosaveLoaded, briefId, initialBrief]);
+  }, [setup, adSets, ads, slide, buildMode, campaignQueue, activeQueueId, isAutosaveLoaded, briefId, initialBrief]);
 
   function clearAutosave() {
     window.localStorage.removeItem(AUTOSAVE_KEY);
@@ -1274,6 +1376,49 @@ export function NewBriefForm({
   function clearImport() {
     setImportedJson(null);
     setImportedValidation(null);
+  }
+
+  function currentBuilderBrief(): JDWCampaignBrief {
+    return buildBrief(setup, adSets, ads) as JDWCampaignBrief;
+  }
+
+  function loadBriefIntoBuilder(brief: JDWCampaignBrief) {
+    const nextState = briefToBuilderState(brief);
+    setSetup(nextState.setup);
+    setAdSets(nextState.adSets);
+    setAds(nextState.ads);
+    setImportedJson(null);
+    setImportedValidation(null);
+    setSubmitError(null);
+  }
+
+  function persistActiveQueueDraft(customSlide = slide) {
+    if (!activeQueueId) return;
+    const draftBrief = currentBuilderBrief();
+    setCampaignQueue((current) =>
+      current.map((item, index) =>
+        item.id === activeQueueId && item.status !== "saved"
+          ? {
+              ...item,
+              brief: draftBrief,
+              label: queueLabelForBrief(draftBrief, index),
+              slide: customSlide,
+            }
+          : item,
+      ),
+    );
+  }
+
+  function selectQueuedCampaign(id: string) {
+    if (id === activeQueueId) return;
+    const target = campaignQueue.find((item) => item.id === id);
+    if (!target || target.status === "saved") return;
+    persistActiveQueueDraft();
+    setActiveQueueId(id);
+    loadBriefIntoBuilder(target.brief);
+    setSlide(target.slide || 0);
+    setBuildMode("ai");
+    setAutosaveMessage(`Loaded ${target.label}`);
   }
 
   function applyValidatedJson(
@@ -1287,25 +1432,25 @@ export function NewBriefForm({
     }
 
     setSubmitError(null);
+    const generatedBriefs = validation.briefs.map((item) => item.brief);
 
-    if (validation.briefs.length === 1) {
-      const nextState = briefToBuilderState(validation.briefs[0].brief);
-      setSetup(nextState.setup);
-      setAdSets(nextState.adSets);
-      setAds(nextState.ads);
-      setImportedJson(null);
-      setImportedValidation(null);
+    if (generatedBriefs.length === 1) {
+      setCampaignQueue([]);
+      setActiveQueueId(null);
+      loadBriefIntoBuilder(generatedBriefs[0]);
       setBuildMode("ai");
       setSlide(0);
       setAutosaveMessage(`${message}; review from step 1`);
       return;
     }
 
-    setImportedJson(json);
-    setImportedValidation(validation);
+    const nextQueue = makeCampaignQueue(generatedBriefs);
+    setCampaignQueue(nextQueue);
+    setActiveQueueId(nextQueue[0]?.id || null);
+    loadBriefIntoBuilder(generatedBriefs[0]);
     setBuildMode("ai");
-    setSlide(11);
-    setAutosaveMessage(message);
+    setSlide(0);
+    setAutosaveMessage(`${generatedBriefs.length} campaigns queued. Review 1 of ${generatedBriefs.length}.`);
   }
 
   function updateSetup<K extends keyof CampaignSetup>(
@@ -1350,29 +1495,81 @@ export function NewBriefForm({
   }
 
   function nextSlide() {
-    setSlide((current) => Math.min(SLIDES.length - 1, current + 1));
+    setSlide((current) => {
+      const next = Math.min(SLIDES.length - 1, current + 1);
+      persistActiveQueueDraft(next);
+      return next;
+    });
   }
 
   function previousSlide() {
-    setSlide((current) => Math.max(0, current - 1));
+    setSlide((current) => {
+      const next = Math.max(0, current - 1);
+      persistActiveQueueDraft(next);
+      return next;
+    });
   }
 
   function submitBrief() {
     setSubmitError(null);
-    const validation = validateBriefJson(activeJson);
+    const jsonToSubmit = manualJson;
+    const validation = validateBriefJson(jsonToSubmit);
     if (!validation.ok) {
       setSubmitError(validation.message);
       return;
     }
 
+    const queueBeforeSave = campaignQueue;
+    const activeIdBeforeSave = activeQueueId;
+    const activeIndexBeforeSave = activeQueueIndex;
+    const currentDraftBrief = currentBuilderBrief();
+    const nextQueuedItem =
+      hasCampaignQueue && activeIdBeforeSave
+        ? [
+            ...queueBeforeSave.slice(Math.max(0, activeIndexBeforeSave + 1)),
+            ...queueBeforeSave.slice(0, Math.max(0, activeIndexBeforeSave)),
+          ].find((item) => item.id !== activeIdBeforeSave && item.status !== "saved")
+        : undefined;
+
     startTransition(async () => {
       const result = briefId
-        ? await updateBriefAction(briefId, activeJson)
-        : await submitBriefAction(activeJson);
+        ? await updateBriefAction(briefId, jsonToSubmit)
+        : await submitBriefAction(jsonToSubmit);
       if (!result.ok) {
         setSubmitError(result.message);
         return;
       }
+
+      if (hasCampaignQueue && activeIdBeforeSave && !briefId) {
+        setCampaignQueue((current) =>
+          current.map((item, index) =>
+            item.id === activeIdBeforeSave
+              ? {
+                  ...item,
+                  brief: currentDraftBrief,
+                  label: queueLabelForBrief(currentDraftBrief, index),
+                  status: "saved" as const,
+                  savedId: result.id,
+                  slide: SLIDES.length - 1,
+                }
+              : item,
+          ),
+        );
+
+        if (nextQueuedItem) {
+          setActiveQueueId(nextQueuedItem.id);
+          loadBriefIntoBuilder(nextQueuedItem.brief);
+          setSlide(nextQueuedItem.slide || 0);
+          setBuildMode("ai");
+          setAutosaveMessage(`Saved. Next: ${nextQueuedItem.label}`);
+          return;
+        }
+
+        window.localStorage.removeItem(AUTOSAVE_KEY);
+        router.push("/inbox");
+        return;
+      }
+
       if (!briefId) window.localStorage.removeItem(AUTOSAVE_KEY);
       router.push(result.ids.length === 1 ? `/brief/${result.id}` : "/inbox");
     });
@@ -1380,12 +1577,15 @@ export function NewBriefForm({
 
   function startManualBuild() {
     clearImport();
+    setCampaignQueue([]);
+    setActiveQueueId(null);
     setBuildMode("manual");
     setSlide(0);
     setSubmitError(null);
   }
 
   function backToStartChoice() {
+    persistActiveQueueDraft();
     setBuildMode("choice");
     setInfoOpen(false);
     setSubmitError(null);
@@ -1405,6 +1605,11 @@ export function NewBriefForm({
   return (
     <div className="one-by-one-builder">
       <BuilderModeBanner mode={buildMode} onBackToStart={backToStartChoice} />
+      <CampaignQueueBar
+        queue={campaignQueue}
+        activeId={activeQueueId}
+        onSelect={selectQueuedCampaign}
+      />
       <div className="pixel-window p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -1446,7 +1651,10 @@ export function NewBriefForm({
             <button
               key={item.label}
               type="button"
-              onClick={() => setSlide(index)}
+              onClick={() => {
+                persistActiveQueueDraft(index);
+                setSlide(index);
+              }}
               className={`step-dot ${index === slide ? "step-dot-active" : ""}`}
               aria-label={`Go to ${slideLabelForPlatform(index, setup.platform)}`}
             />
@@ -1461,6 +1669,8 @@ export function NewBriefForm({
           isPending={isPending}
           briefId={briefId}
           importedJson={importedJson}
+          queueTotal={queueTotal}
+          hasNextQueuedCampaign={hasNextQueuedCampaign}
         />
       </div>
 

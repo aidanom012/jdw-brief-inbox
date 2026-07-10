@@ -65,7 +65,6 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [batchBriefs, setBatchBriefs] = useState<JDWCampaignBrief[]>([]);
   const [tokenUsage, setTokenUsage] = useState<AiTokenUsage | null>(null);
   const characterCount = rawBrief.trim().length;
 
@@ -73,14 +72,12 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
     const validation = validationForSingleBrief(brief);
     onGenerated(JSON.stringify(brief, null, 2), validation, message);
     setSuccess(message);
-    setBatchBriefs([]);
   }
 
   async function generateBrief() {
     const cleanBrief = rawBrief.trim();
     setError(null);
     setSuccess(null);
-    setBatchBriefs([]);
     setTokenUsage(null);
 
     if (!cleanBrief) {
@@ -113,9 +110,12 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
 
       const validation = validateGeneratedPayload(result.generated);
       if (validation.briefs.length > 1) {
-        const briefs = validation.briefs.map((brief) => brief.brief);
-        setBatchBriefs(briefs);
-        setSuccess(`${briefs.length} briefs generated. Pick one to review.`);
+        onGenerated(
+          JSON.stringify(result.generated, null, 2),
+          validation,
+          `${validation.briefs.length} AI campaigns queued. Review one at a time.`
+        );
+        setSuccess(`${validation.briefs.length} AI campaigns queued. Review one at a time.`);
         return;
       }
 
@@ -167,28 +167,6 @@ export function AiBriefPanel({ onGenerated }: AiBriefPanelProps) {
           <span>Server-side API key only</span>
         </div>
 
-        {batchBriefs.length > 0 ? (
-          <div className="pixel-card p-3">
-            <p className="pixel-label">Multiple briefs detected</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {batchBriefs.map((brief, index) => (
-                <button
-                  key={`${briefLabel(brief, index)}-${index}`}
-                  type="button"
-                  onClick={() =>
-                    loadBrief(
-                      brief,
-                      `Loaded AI brief ${index + 1} of ${batchBriefs.length}`
-                    )
-                  }
-                  className="mini-button"
-                >
-                  {briefLabel(brief, index)}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         {error ? (
           <p className="pixel-alert whitespace-pre-wrap p-3 text-sm font-bold" role="alert">
