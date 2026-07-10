@@ -10,10 +10,10 @@ The Gemini API key is server-only. Set these locally and in Vercel:
 
 ```env
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
-The frontend calls `/api/gemini/brief` with only the pasted raw brief. The backend calls Gemini with JSON response mode, validates the result against the existing JDW schema, and returns validated campaign data. No Supabase data, saved briefs, or unrelated user data are sent to Gemini.
+The frontend calls `/api/gemini/brief` with only the pasted raw brief. The backend calls Gemini with structured JSON output, validates the result against the existing JDW schema, and returns validated campaign data. No Supabase data, saved briefs, or unrelated user data are sent to Gemini.
 
 See `GEMINI_SETUP.md` for setup and key-rotation notes.
 

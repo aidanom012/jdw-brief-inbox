@@ -6,11 +6,12 @@ import {
   type JDWCampaignBrief
 } from "@/lib/brief-schema";
 
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+const FALLBACK_GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
 const MAX_OUTPUT_TOKENS = 8192;
 export const MAX_RAW_GEMINI_BRIEF_LENGTH = 50_000;
 
-type GeminiApiResponse = {
+type GeminiGenerateContentResponse = {
   candidates?: Array<{
     content?: {
       parts?: Array<{
@@ -22,6 +23,9 @@ type GeminiApiResponse = {
     message?: string;
   };
 };
+
+type JsonObject = Record<string, unknown>;
+type JsonSchema = Record<string, unknown>;
 
 export type GeneratedBriefPayload =
   | JDWCampaignBrief
@@ -144,6 +148,171 @@ build.priority: urgent, normal, hold, unknown, or null
 Put ads inside their parent ad set whenever the brief says which ad belongs to which audience. If the relationship is unclear, put the ad under each relevant ad set only when the brief explicitly says so; otherwise keep it in the top-level ads array.
 Use numbers for budget_amount, budget.amount, age_min, and age_max.`;
 
+function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties,
+    required: Object.keys(properties)
+  };
+}
+
+function nullableString(description?: string): JsonSchema {
+  return {
+    type: ["string", "null"],
+    ...(description ? { description } : {})
+  };
+}
+
+function nullableNumber(description?: string): JsonSchema {
+  return {
+    type: ["number", "null"],
+    ...(description ? { description } : {})
+  };
+}
+
+function stringArray(description?: string): JsonSchema {
+  return {
+    type: "array",
+    items: { type: "string" },
+    ...(description ? { description } : {})
+  };
+}
+
+function nullableEnum(values: string[], description?: string): JsonSchema {
+  return {
+    type: ["string", "null"],
+    enum: [...values, null],
+    ...(description ? { description } : {})
+  };
+}
+
+const adJsonSchema = objectSchema({
+  label: nullableString(),
+  release_title: nullableString(),
+  asset_type: nullableEnum(["video", "image", "carousel", "spark_ad", "unknown"]),
+  asset_links: stringArray("Asset, Drive, Dropbox, TikTok, Meta, or creative links."),
+  post_url: nullableString("Existing organic post URL if supplied."),
+  boost_code: nullableString("TikTok/Spark/boost code if supplied."),
+  destination_url: nullableString("Landing, streaming, or click-through URL."),
+  copy: nullableString("Ad copy exactly as supplied."),
+  notes: nullableString()
+});
+
+const adSetJsonSchema = objectSchema({
+  label: nullableString(),
+  locations: stringArray("Audience locations or territory details."),
+  age_min: nullableNumber(),
+  age_max: nullableNumber(),
+  gender: nullableEnum(["all", "male", "female", "unknown"]),
+  placements: stringArray(),
+  targeting_type: nullableEnum([
+    "broad",
+    "interest",
+    "lookalike",
+    "retargeting",
+    "advantage_plus",
+    "unknown"
+  ]),
+  targeting_details: nullableString(),
+  exclusions: nullableString(),
+  budget_amount: nullableNumber(),
+  budget_type: nullableEnum(["daily", "lifetime", "campaign_total", "unknown"]),
+  notes: nullableString(),
+  ads: {
+    type: "array",
+    items: adJsonSchema
+  }
+});
+
+const singleBriefJsonSchema = objectSchema({
+  brief_version: {
+    type: "string",
+    enum: ["JDW_CAMPAIGN_BRIEF_V1"]
+  },
+  source: objectSchema({
+    source_type: nullableEnum([
+      "email",
+      "handover",
+      "paid_media_brief",
+      "report",
+      "quick_note",
+      "unknown"
+    ]),
+    source_title: nullableString(),
+    source_date: nullableString(),
+    original_item_label: nullableString(),
+    source_notes: stringArray()
+  }),
+  build: objectSchema({
+    action: nullableEnum([
+      "new_campaign",
+      "add_ad_set",
+      "boost_post",
+      "update_existing_campaign",
+      "budget_change",
+      "hold",
+      "report_reference",
+      "unknown"
+    ]),
+    existing_campaign_name: nullableString(),
+    approval_required: {
+      type: ["boolean", "null"]
+    },
+    launch_instruction: nullableString(),
+    priority: nullableEnum(["urgent", "normal", "hold", "unknown"])
+  }),
+  campaign: objectSchema({
+    artist: nullableString(),
+    release_title: nullableString(),
+    acid: nullableString(),
+    asid: nullableString(),
+    platform: nullableEnum(["Meta", "TikTok", "YouTube", "Other"]),
+    account: nullableString(),
+    objective: nullableString(),
+    campaign_type: nullableString(),
+    conversion_location: nullableString(),
+    optimisation_event: nullableString(),
+    pixel: nullableString(),
+    territory_summary: nullableString(),
+    start_date: nullableString(),
+    end_date: nullableString(),
+    campaign_notes: nullableString()
+  }),
+  budget: objectSchema({
+    type: nullableEnum(["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"]),
+    amount: nullableNumber(),
+    currency: nullableEnum(["GBP", "EUR", "USD", "AUD", "CAD", "unknown"]),
+    notes: nullableString()
+  }),
+  ad_sets: {
+    type: "array",
+    items: adSetJsonSchema
+  },
+  ads: {
+    type: "array",
+    items: adJsonSchema
+  },
+  special_notes: stringArray(),
+  missing_required_fields: stringArray()
+});
+
+const briefResponseJsonSchema = {
+  anyOf: [
+    singleBriefJsonSchema,
+    objectSchema({
+      brief_version: {
+        type: "string",
+        enum: ["JDW_CAMPAIGN_BRIEF_BATCH_V1"]
+      },
+      briefs: {
+        type: "array",
+        items: singleBriefJsonSchema
+      }
+    })
+  ]
+};
+
 function briefPayloadFromValidation(
   validation: Extract<BriefValidationResult, { ok: true }>
 ): GeneratedBriefPayload {
@@ -157,7 +326,7 @@ function briefPayloadFromValidation(
   return validation.briefs[0].brief;
 }
 
-function extractGeminiText(response: GeminiApiResponse): string {
+function extractGenerateContentText(response: GeminiGenerateContentResponse): string {
   const text = response.candidates?.[0]?.content?.parts
     ?.map((part) => part.text || "")
     .join("")
@@ -168,6 +337,58 @@ function extractGeminiText(response: GeminiApiResponse): string {
   }
 
   return text;
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isGeneratedBriefObject(value: unknown): boolean {
+  return (
+    isJsonObject(value) &&
+    (value.brief_version === "JDW_CAMPAIGN_BRIEF_V1" ||
+      value.brief_version === "JDW_CAMPAIGN_BRIEF_BATCH_V1")
+  );
+}
+
+function collectLikelyJsonStrings(value: unknown, depth = 0): string[] {
+  if (depth > 6) {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return value.includes("JDW_CAMPAIGN_BRIEF") ? [value] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectLikelyJsonStrings(item, depth + 1));
+  }
+
+  if (!isJsonObject(value)) {
+    return [];
+  }
+
+  return Object.values(value).flatMap((item) => collectLikelyJsonStrings(item, depth + 1));
+}
+
+function extractGeneratedJsonText(response: unknown): string {
+  if (isGeneratedBriefObject(response)) {
+    return JSON.stringify(response);
+  }
+
+  if (isJsonObject(response)) {
+    const outputText = response.output_text || response.outputText;
+    if (typeof outputText === "string" && outputText.trim().length > 0) {
+      return outputText.trim();
+    }
+  }
+
+  const [jsonText] = collectLikelyJsonStrings(response);
+  if (jsonText) {
+    return jsonText.trim();
+  }
+
+  throw new GeminiBriefError("Gemini did not return any JSON.", 502);
 }
 
 function parseJsonOnly(text: string): unknown {
@@ -201,59 +422,171 @@ function validationIssues(validation: BriefValidationResult): string[] | undefin
   return validation.ok ? undefined : validation.issues;
 }
 
-export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBriefResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new GeminiBriefError("Gemini is not configured for this app yet.", 500);
+function cleanDetail(value: unknown): string | null {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
   }
 
-  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  return value.trim().replace(/\s+/g, " ").slice(0, 700);
+}
+
+function geminiErrorDetail(payload: unknown): string | null {
+  if (!isJsonObject(payload)) {
+    return null;
+  }
+
+  const error = payload.error;
+  if (isJsonObject(error)) {
+    return cleanDetail(error.message) || cleanDetail(error.status) || cleanDetail(error.code);
+  }
+
+  return cleanDetail(payload.message) || cleanDetail(payload.error_description);
+}
+
+function apiIssue(source: string, model: string, response: Response, payload: unknown): string {
+  const detail = geminiErrorDetail(payload);
+  return detail
+    ? `${source} using ${model} returned ${response.status}: ${detail}`
+    : `${source} using ${model} returned ${response.status} ${response.statusText || "without details"}.`;
+}
+
+function isCredentialOrQuotaError(error: GeminiBriefError): boolean {
+  const detail = [error.message, ...(error.issues || [])].join(" ").toLowerCase();
+  return /api key|permission|billing|quota|rate limit|unauthorized|forbidden|not enabled|disabled|location/.test(
+    detail
+  );
+}
+
+function configuredModels(): string[] {
+  return Array.from(
+    new Set(
+      [process.env.GEMINI_MODEL?.trim(), DEFAULT_GEMINI_MODEL, ...FALLBACK_GEMINI_MODELS].filter(
+        (model): model is string => Boolean(model)
+      )
+    )
+  );
+}
+
+async function readJsonResponse(response: Response): Promise<unknown> {
+  const raw = await response.text();
+  if (!raw.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new GeminiBriefError("Gemini returned an unreadable response.", 502, [
+      raw.trim().slice(0, 500)
+    ]);
+  }
+}
+
+async function postGeminiJson(
+  endpoint: string,
+  apiKey: string,
+  body: unknown
+): Promise<{ response: Response; payload: unknown }> {
+  let response: Response;
+
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    throw new GeminiBriefError("Gemini API was unreachable.", 502, [
+      error instanceof Error ? error.message : "Network request failed."
+    ]);
+  }
+
+  return {
+    response,
+    payload: await readJsonResponse(response)
+  };
+}
+
+async function generateWithInteractionsApi(
+  apiKey: string,
+  model: string,
+  rawBrief: string
+): Promise<unknown> {
+  const { response, payload } = await postGeminiJson(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    apiKey,
+    {
+      model,
+      input: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`,
+      store: false,
+      generation_config: {
+        temperature: 0.1,
+        top_p: 0.8,
+        candidate_count: 1,
+        max_output_tokens: MAX_OUTPUT_TOKENS,
+        thinking_level: "low"
+      },
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: briefResponseJsonSchema
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
+      apiIssue("Interactions API", model, response, payload)
+    ]);
+  }
+
+  return parseJsonOnly(extractGeneratedJsonText(payload));
+}
+
+async function generateWithGenerateContentApi(
+  apiKey: string,
+  model: string,
+  rawBrief: string
+): Promise<unknown> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent`;
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        topP: 0.8,
-        candidateCount: 1,
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-        responseMimeType: "application/json"
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`
+          }
+        ]
       }
-    })
-  });
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      candidateCount: 1,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      responseMimeType: "application/json"
+    }
+  };
 
-  let geminiJson: GeminiApiResponse;
-  try {
-    geminiJson = (await response.json()) as GeminiApiResponse;
-  } catch {
-    throw new GeminiBriefError("Gemini returned an unreadable response.", 502);
-  }
+  const { response, payload } = await postGeminiJson(endpoint, apiKey, body);
 
   if (!response.ok) {
-    throw new GeminiBriefError(
-      geminiJson.error?.message ? "Gemini could not generate this brief." : "Gemini request failed.",
-      502
-    );
+    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
+      apiIssue("generateContent API", model, response, payload)
+    ]);
   }
 
-  const generated = parseJsonOnly(extractGeminiText(geminiJson));
+  return parseJsonOnly(extractGenerateContentText(payload as GeminiGenerateContentResponse));
+}
+
+function validateGeneratedBrief(generated: unknown): GeminiBriefResult {
   const rawGeneratedJson = JSON.stringify(generated);
   const validation = validateBriefJson(rawGeneratedJson);
 
@@ -269,4 +602,50 @@ export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBrief
     payload: briefPayloadFromValidation(validation),
     validation
   };
+}
+
+export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBriefResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new GeminiBriefError("Gemini is not configured for this app yet.", 500);
+  }
+
+  let lastError: GeminiBriefError | null = null;
+
+  for (const model of configuredModels()) {
+    try {
+      return validateGeneratedBrief(await generateWithInteractionsApi(apiKey, model, rawBrief));
+    } catch (error) {
+      if (!(error instanceof GeminiBriefError)) {
+        throw error;
+      }
+
+      lastError = error;
+      if (isCredentialOrQuotaError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  for (const model of configuredModels()) {
+    try {
+      return validateGeneratedBrief(await generateWithGenerateContentApi(apiKey, model, rawBrief));
+    } catch (error) {
+      if (!(error instanceof GeminiBriefError)) {
+        throw error;
+      }
+
+      lastError = error;
+      if (isCredentialOrQuotaError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw (
+    lastError ||
+    new GeminiBriefError("Gemini could not generate this brief.", 502, [
+      "All configured Gemini models failed."
+    ])
+  );
 }
