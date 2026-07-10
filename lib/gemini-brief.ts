@@ -7,24 +7,9 @@ import {
 } from "@/lib/brief-schema";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-const DEFAULT_RETRYABLE_STATUS_CODES = new Set([503]);
-const UNAVAILABLE_GEMINI_MODELS = new Set([
-  "gemini-2.5-flash",
-  "models/gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "models/gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "models/gemini-2.0-flash-lite"
-]);
-const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
-const HARD_MAX_OUTPUT_TOKENS = 12000;
+const FALLBACK_GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+const MAX_OUTPUT_TOKENS = 8192;
 export const MAX_RAW_GEMINI_BRIEF_LENGTH = 50_000;
-
-type GeminiUsageMetadata = {
-  promptTokenCount?: number;
-  candidatesTokenCount?: number;
-  totalTokenCount?: number;
-};
 
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
@@ -33,30 +18,7 @@ type GeminiGenerateContentResponse = {
         text?: string;
       }>;
     };
-    finishReason?: string;
   }>;
-  usageMetadata?: GeminiUsageMetadata;
-  error?: {
-    message?: string;
-  };
-};
-
-type GeminiInteractionResponse = {
-  status?: string;
-  output_text?: string;
-  outputText?: string;
-  steps?: Array<{
-    type?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
-  }>;
-  usage?: {
-    total_input_tokens?: number;
-    total_output_tokens?: number;
-    total_tokens?: number;
-  };
   error?: {
     message?: string;
   };
@@ -64,63 +26,6 @@ type GeminiInteractionResponse = {
 
 type JsonObject = Record<string, unknown>;
 type JsonSchema = Record<string, unknown>;
-
-type CompactAd = {
-  label: string;
-  release_title: string;
-  asset_type: string;
-  asset_links: string[];
-  post_url: string;
-  boost_code: string;
-  destination_url: string;
-  copy: string;
-  notes: string;
-};
-
-type CompactAdSet = {
-  label: string;
-  locations: string[];
-  age_min: string;
-  age_max: string;
-  gender: string;
-  placements: string[];
-  budget_amount: string;
-  budget_type: string;
-  targeting_type: string;
-  targeting_details: string;
-  exclusions: string;
-  notes: string;
-  ads: CompactAd[];
-};
-
-type CompactBrief = {
-  artist: string;
-  release_title: string;
-  acid: string;
-  asid: string;
-  platform: string;
-  account: string;
-  objective: string;
-  campaign_type: string;
-  conversion_location: string;
-  optimisation_event: string;
-  pixel: string;
-  territory_summary: string;
-  start_date: string;
-  end_date: string;
-  campaign_notes: string;
-  budget_type: string;
-  budget_amount: string;
-  currency: string;
-  budget_notes: string;
-  ad_sets: CompactAdSet[];
-  ads: CompactAd[];
-  special_notes: string[];
-};
-
-type CompactGeminiPayload = {
-  briefs: CompactBrief[];
-};
 
 export type GeneratedBriefPayload =
   | JDWCampaignBrief
@@ -132,7 +37,6 @@ export type GeneratedBriefPayload =
 export type GeminiBriefResult = {
   payload: GeneratedBriefPayload;
   validation: Extract<BriefValidationResult, { ok: true }>;
-  usage?: GeminiUsageMetadata;
 };
 
 export class GeminiBriefError extends Error {
@@ -145,35 +49,129 @@ export class GeminiBriefError extends Error {
   }
 }
 
-const GEMINI_BRIEF_PROMPT = `You are an extraction engine, not a copywriter.
-Extract campaign data from a raw JDW / James Walker note into the compact JSON schema supplied by the API response_format.
-Return ONLY the compact object with top-level key "briefs".
-NEVER output JDW_CAMPAIGN_BRIEF_V1, JDW_CAMPAIGN_BRIEF_BATCH_V1, source, build, campaign, budget, missing_required_fields, or the full app schema.
-Use empty strings or empty arrays when information is missing. Do not guess.
-Preserve exact supplied values for ACID, ASID, budgets, dates, links, pixel, account, platform, targeting, copy, post URLs, boost codes, and asset links.
-If there are multiple distinct campaign setups, return one item per setup in briefs[].
-Keep notes short. Do not repeat the raw brief.`;
+const GEMINI_BRIEF_PROMPT = `You convert messy JDW / James Walker paid social campaign briefs into strict JSON for a private campaign brief builder.
 
-function objectSchema(
-  properties: Record<string, JsonSchema>,
-  propertyOrdering?: string[]
-): JsonSchema {
+Return JSON only. Do not include markdown, comments, or explanations.
+Do not guess missing fields. If a field is not clearly present, use null, "unknown", or [] as appropriate.
+Preserve exact details from the brief, including budgets, dates, links, ACID, ASID, pixel, optimisation event, account, platform, territory, targeting, ad copy, post URLs, boost codes, and asset links.
+Do not invent targeting, dates, budgets, pixels, campaign names, copy, or links.
+
+If the pasted text contains one campaign, return one JDW_CAMPAIGN_BRIEF_V1 object.
+If it contains multiple distinct campaign setups, return a JDW_CAMPAIGN_BRIEF_BATCH_V1 object with a briefs array.
+
+Use this exact object shape for a single campaign:
+{
+  "brief_version": "JDW_CAMPAIGN_BRIEF_V1",
+  "source": {
+    "source_type": "quick_note",
+    "source_title": "Gemini raw brief parser",
+    "source_date": null,
+    "original_item_label": null,
+    "source_notes": []
+  },
+  "build": {
+    "action": "new_campaign",
+    "existing_campaign_name": null,
+    "approval_required": null,
+    "launch_instruction": null,
+    "priority": "normal"
+  },
+  "campaign": {
+    "artist": null,
+    "release_title": null,
+    "acid": null,
+    "asid": null,
+    "platform": null,
+    "account": null,
+    "objective": null,
+    "campaign_type": null,
+    "conversion_location": null,
+    "optimisation_event": null,
+    "pixel": null,
+    "territory_summary": null,
+    "start_date": null,
+    "end_date": null,
+    "campaign_notes": null
+  },
+  "budget": {
+    "type": null,
+    "amount": null,
+    "currency": null,
+    "notes": null
+  },
+  "ad_sets": [
+    {
+      "label": null,
+      "locations": [],
+      "age_min": null,
+      "age_max": null,
+      "gender": "unknown",
+      "placements": [],
+      "targeting_type": "unknown",
+      "targeting_details": null,
+      "exclusions": null,
+      "budget_amount": null,
+      "budget_type": null,
+      "notes": null,
+      "ads": [
+        {
+          "label": null,
+          "release_title": null,
+          "asset_type": "unknown",
+          "asset_links": [],
+          "post_url": null,
+          "boost_code": null,
+          "destination_url": null,
+          "copy": null,
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "ads": [],
+  "special_notes": [],
+  "missing_required_fields": []
+}
+
+Allowed enum values:
+platform: Meta, TikTok, YouTube, Other, or null
+budget.type: daily, lifetime, campaign_total, ad_set_level, unknown, or null
+ad set budget_type: daily, lifetime, campaign_total, unknown, or null
+currency: GBP, EUR, USD, AUD, CAD, unknown, or null
+gender: all, male, female, unknown, or null
+targeting_type: broad, interest, lookalike, retargeting, advantage_plus, unknown, or null
+asset_type: video, image, carousel, spark_ad, unknown, or null
+source_type: email, handover, paid_media_brief, report, quick_note, unknown, or null
+build.action: new_campaign, add_ad_set, boost_post, update_existing_campaign, budget_change, hold, report_reference, unknown, or null
+build.priority: urgent, normal, hold, unknown, or null
+
+Put ads inside their parent ad set whenever the brief says which ad belongs to which audience. If the relationship is unclear, put the ad under each relevant ad set only when the brief explicitly says so; otherwise keep it in the top-level ads array.
+Use numbers for budget_amount, budget.amount, age_min, and age_max.`;
+
+function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
   return {
     type: "object",
+    additionalProperties: false,
     properties,
-    required: Object.keys(properties),
-    ...(propertyOrdering ? { propertyOrdering } : {})
+    required: Object.keys(properties)
   };
 }
 
-function stringSchema(description?: string): JsonSchema {
+function nullableString(description?: string): JsonSchema {
   return {
-    type: "string",
+    type: ["string", "null"],
     ...(description ? { description } : {})
   };
 }
 
-function stringArraySchema(description?: string): JsonSchema {
+function nullableNumber(description?: string): JsonSchema {
+  return {
+    type: ["number", "null"],
+    ...(description ? { description } : {})
+  };
+}
+
+function stringArray(description?: string): JsonSchema {
   return {
     type: "array",
     items: { type: "string" },
@@ -181,134 +179,139 @@ function stringArraySchema(description?: string): JsonSchema {
   };
 }
 
-const compactAdSchema = objectSchema(
-  {
-    label: stringSchema("Short ad label from the brief."),
-    release_title: stringSchema(),
-    asset_type: stringSchema("video, image, carousel, spark_ad, or unknown."),
-    asset_links: stringArraySchema("Creative, Box, Drive, Dropbox, TikTok, Meta, or other asset links."),
-    post_url: stringSchema("Existing organic post URL if supplied."),
-    boost_code: stringSchema("TikTok/Spark/boost code if supplied."),
-    destination_url: stringSchema("Landing, streaming, or click-through URL."),
-    copy: stringSchema("Ad copy exactly as supplied."),
-    notes: stringSchema()
-  },
-  [
-    "label",
-    "release_title",
-    "asset_type",
-    "asset_links",
-    "post_url",
-    "boost_code",
-    "destination_url",
-    "copy",
-    "notes"
-  ]
-);
+function nullableEnum(values: string[], description?: string): JsonSchema {
+  return {
+    type: ["string", "null"],
+    enum: [...values, null],
+    ...(description ? { description } : {})
+  };
+}
 
-const compactAdSetSchema = objectSchema(
-  {
-    label: stringSchema("Short ad set label from the brief."),
-    locations: stringArraySchema("Audience locations or territory details."),
-    age_min: stringSchema("Minimum age exactly as supplied, or empty string."),
-    age_max: stringSchema("Maximum age exactly as supplied, or empty string."),
-    gender: stringSchema("all, male, female, unknown, or empty string."),
-    placements: stringArraySchema("Placements such as IG, FB, TikTok, Reels, Stories."),
-    budget_amount: stringSchema("Ad set budget amount exactly as supplied, or empty string."),
-    budget_type: stringSchema("daily, lifetime, campaign_total, unknown, or empty string."),
-    targeting_type: stringSchema("broad, interest, lookalike, retargeting, advantage_plus, unknown, or empty string."),
-    targeting_details: stringSchema("Audience interests, seed artists, LAL source, warm audience, broad notes."),
-    exclusions: stringSchema(),
-    notes: stringSchema(),
-    ads: {
-      type: "array",
-      items: compactAdSchema
-    }
-  },
-  [
-    "label",
-    "locations",
-    "age_min",
-    "age_max",
-    "gender",
-    "placements",
-    "budget_amount",
-    "budget_type",
-    "targeting_type",
-    "targeting_details",
-    "exclusions",
-    "notes",
-    "ads"
-  ]
-);
+const adJsonSchema = objectSchema({
+  label: nullableString(),
+  release_title: nullableString(),
+  asset_type: nullableEnum(["video", "image", "carousel", "spark_ad", "unknown"]),
+  asset_links: stringArray("Asset, Drive, Dropbox, TikTok, Meta, or creative links."),
+  post_url: nullableString("Existing organic post URL if supplied."),
+  boost_code: nullableString("TikTok/Spark/boost code if supplied."),
+  destination_url: nullableString("Landing, streaming, or click-through URL."),
+  copy: nullableString("Ad copy exactly as supplied."),
+  notes: nullableString()
+});
 
-const compactBriefSchema = objectSchema(
-  {
-    artist: stringSchema(),
-    release_title: stringSchema(),
-    acid: stringSchema(),
-    asid: stringSchema(),
-    platform: stringSchema("Meta, TikTok, YouTube, Other, unknown, or empty string."),
-    account: stringSchema(),
-    objective: stringSchema(),
-    campaign_type: stringSchema(),
-    conversion_location: stringSchema(),
-    optimisation_event: stringSchema(),
-    pixel: stringSchema(),
-    territory_summary: stringSchema(),
-    start_date: stringSchema(),
-    end_date: stringSchema(),
-    campaign_notes: stringSchema(),
-    budget_type: stringSchema("daily, lifetime, campaign_total, ad_set_level, unknown, or empty string."),
-    budget_amount: stringSchema("Budget amount exactly as supplied, or empty string."),
-    currency: stringSchema("GBP, EUR, USD, AUD, CAD, unknown, or empty string."),
-    budget_notes: stringSchema(),
-    ad_sets: {
-      type: "array",
-      items: compactAdSetSchema
+const adSetJsonSchema = objectSchema({
+  label: nullableString(),
+  locations: stringArray("Audience locations or territory details."),
+  age_min: nullableNumber(),
+  age_max: nullableNumber(),
+  gender: nullableEnum(["all", "male", "female", "unknown"]),
+  placements: stringArray(),
+  targeting_type: nullableEnum([
+    "broad",
+    "interest",
+    "lookalike",
+    "retargeting",
+    "advantage_plus",
+    "unknown"
+  ]),
+  targeting_details: nullableString(),
+  exclusions: nullableString(),
+  budget_amount: nullableNumber(),
+  budget_type: nullableEnum(["daily", "lifetime", "campaign_total", "unknown"]),
+  notes: nullableString(),
+  ads: {
+    type: "array",
+    items: adJsonSchema
+  }
+});
+
+const singleBriefJsonSchema = objectSchema({
+  brief_version: {
+    type: "string",
+    enum: ["JDW_CAMPAIGN_BRIEF_V1"]
+  },
+  source: objectSchema({
+    source_type: nullableEnum([
+      "email",
+      "handover",
+      "paid_media_brief",
+      "report",
+      "quick_note",
+      "unknown"
+    ]),
+    source_title: nullableString(),
+    source_date: nullableString(),
+    original_item_label: nullableString(),
+    source_notes: stringArray()
+  }),
+  build: objectSchema({
+    action: nullableEnum([
+      "new_campaign",
+      "add_ad_set",
+      "boost_post",
+      "update_existing_campaign",
+      "budget_change",
+      "hold",
+      "report_reference",
+      "unknown"
+    ]),
+    existing_campaign_name: nullableString(),
+    approval_required: {
+      type: ["boolean", "null"]
     },
-    ads: {
-      type: "array",
-      items: compactAdSchema
-    },
-    special_notes: stringArraySchema()
+    launch_instruction: nullableString(),
+    priority: nullableEnum(["urgent", "normal", "hold", "unknown"])
+  }),
+  campaign: objectSchema({
+    artist: nullableString(),
+    release_title: nullableString(),
+    acid: nullableString(),
+    asid: nullableString(),
+    platform: nullableEnum(["Meta", "TikTok", "YouTube", "Other"]),
+    account: nullableString(),
+    objective: nullableString(),
+    campaign_type: nullableString(),
+    conversion_location: nullableString(),
+    optimisation_event: nullableString(),
+    pixel: nullableString(),
+    territory_summary: nullableString(),
+    start_date: nullableString(),
+    end_date: nullableString(),
+    campaign_notes: nullableString()
+  }),
+  budget: objectSchema({
+    type: nullableEnum(["daily", "lifetime", "campaign_total", "ad_set_level", "unknown"]),
+    amount: nullableNumber(),
+    currency: nullableEnum(["GBP", "EUR", "USD", "AUD", "CAD", "unknown"]),
+    notes: nullableString()
+  }),
+  ad_sets: {
+    type: "array",
+    items: adSetJsonSchema
   },
-  [
-    "artist",
-    "release_title",
-    "acid",
-    "asid",
-    "platform",
-    "account",
-    "objective",
-    "campaign_type",
-    "conversion_location",
-    "optimisation_event",
-    "pixel",
-    "territory_summary",
-    "start_date",
-    "end_date",
-    "campaign_notes",
-    "budget_type",
-    "budget_amount",
-    "currency",
-    "budget_notes",
-    "ad_sets",
-    "ads",
-    "special_notes"
-  ]
-);
+  ads: {
+    type: "array",
+    items: adJsonSchema
+  },
+  special_notes: stringArray(),
+  missing_required_fields: stringArray()
+});
 
-const compactResponseJsonSchema = objectSchema(
-  {
-    briefs: {
-      type: "array",
-      minItems: 1,
-      items: compactBriefSchema
-    }
-  },
-  ["briefs"]
-);
+const briefResponseJsonSchema = {
+  anyOf: [
+    singleBriefJsonSchema,
+    objectSchema({
+      brief_version: {
+        type: "string",
+        enum: ["JDW_CAMPAIGN_BRIEF_BATCH_V1"]
+      },
+      briefs: {
+        type: "array",
+        items: singleBriefJsonSchema
+      }
+    })
+  ]
+};
 
 function briefPayloadFromValidation(
   validation: Extract<BriefValidationResult, { ok: true }>
@@ -321,18 +324,6 @@ function briefPayloadFromValidation(
   }
 
   return validation.briefs[0].brief;
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function isGeneratedBriefObject(value: unknown): boolean {
-  return (
-    isJsonObject(value) &&
-    (value.brief_version === "JDW_CAMPAIGN_BRIEF_V1" ||
-      value.brief_version === "JDW_CAMPAIGN_BRIEF_BATCH_V1")
-  );
 }
 
 function extractGenerateContentText(response: GeminiGenerateContentResponse): string {
@@ -348,156 +339,83 @@ function extractGenerateContentText(response: GeminiGenerateContentResponse): st
   return text;
 }
 
-function extractInteractionText(response: GeminiInteractionResponse): string {
-  const directText = (response.output_text || response.outputText || "").trim();
-  if (directText) {
-    return directText;
-  }
-
-  const modelOutputTexts = (response.steps || [])
-    .filter((step) => step.type === "model_output")
-    .flatMap((step) => step.content || [])
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text || "")
-    .join("")
-    .trim();
-
-  if (!modelOutputTexts) {
-    throw new GeminiBriefError("Gemini did not return any JSON.", 502);
-  }
-
-  return modelOutputTexts;
+function isJsonObject(value: unknown): value is JsonObject {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function interactionUsageToGeminiUsage(
-  usage: GeminiInteractionResponse["usage"] | undefined
-): GeminiUsageMetadata | undefined {
-  if (!usage) {
-    return undefined;
-  }
-
-  return {
-    promptTokenCount: usage.total_input_tokens,
-    candidatesTokenCount: usage.total_output_tokens,
-    totalTokenCount: usage.total_tokens
-  };
+function isGeneratedBriefObject(value: unknown): boolean {
+  return (
+    isJsonObject(value) &&
+    (value.brief_version === "JDW_CAMPAIGN_BRIEF_V1" ||
+      value.brief_version === "JDW_CAMPAIGN_BRIEF_BATCH_V1")
+  );
 }
 
-function stripMarkdownJsonFence(text: string): string {
-  return text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-}
-
-function findBalancedJsonCandidate(text: string): string | null {
-  const cleaned = stripMarkdownJsonFence(text);
-  const start = cleaned.search(/[\[{]/);
-  if (start < 0) {
-    return null;
+function collectLikelyJsonStrings(value: unknown, depth = 0): string[] {
+  if (depth > 6) {
+    return [];
   }
 
-  const stack: string[] = [];
-  let inString = false;
-  let escaped = false;
-
-  for (let index = start; index < cleaned.length; index += 1) {
-    const char = cleaned[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      stack.push("}");
-      continue;
-    }
-
-    if (char === "[") {
-      stack.push("]");
-      continue;
-    }
-
-    if (char === "}" || char === "]") {
-      const expected = stack.pop();
-      if (expected !== char) {
-        return null;
-      }
-
-      if (stack.length === 0) {
-        return cleaned.slice(start, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function normaliseGeneratedJsonShape(value: unknown): unknown {
-  if (isGeneratedBriefObject(value)) {
-    return value;
+  if (typeof value === "string") {
+    return value.includes("JDW_CAMPAIGN_BRIEF") ? [value] : [];
   }
 
   if (Array.isArray(value)) {
-    const briefObjects = value.filter(isJsonObject);
-    if (briefObjects.length > 0) {
-      return {
-        briefs: briefObjects
-      };
-    }
+    return value.flatMap((item) => collectLikelyJsonStrings(item, depth + 1));
   }
 
-  if (isJsonObject(value) && Array.isArray(value.briefs)) {
-    return value;
+  if (!isJsonObject(value)) {
+    return [];
   }
 
-  if (isJsonObject(value)) {
-    return {
-      briefs: [value]
-    };
-  }
-
-  return value;
+  return Object.values(value).flatMap((item) => collectLikelyJsonStrings(item, depth + 1));
 }
 
-function parseJsonOnly(text: string, finishReason?: string): unknown {
-  const attempts = [text.trim(), stripMarkdownJsonFence(text)];
-  const balancedCandidate = findBalancedJsonCandidate(text);
-  if (balancedCandidate) {
-    attempts.push(balancedCandidate);
+function extractGeneratedJsonText(response: unknown): string {
+  if (isGeneratedBriefObject(response)) {
+    return JSON.stringify(response);
   }
 
-  const uniqueAttempts = Array.from(new Set(attempts.filter(Boolean)));
-  for (const candidate of uniqueAttempts) {
-    try {
-      return normaliseGeneratedJsonShape(JSON.parse(candidate));
-    } catch {
-      // Try the next candidate without spending another Gemini request.
+  if (isJsonObject(response)) {
+    const outputText = response.output_text || response.outputText;
+    if (typeof outputText === "string" && outputText.trim().length > 0) {
+      return outputText.trim();
     }
   }
 
-  const cleaned = stripMarkdownJsonFence(text);
-  const looksCutOff = !balancedCandidate || finishReason === "MAX_TOKENS";
-  const message = looksCutOff
-    ? "Gemini returned JSON-looking text, but it was cut off before it became valid JSON. The app did not spend another request trying to repair it."
-    : "Gemini returned text that was not valid JSON.";
+  const [jsonText] = collectLikelyJsonStrings(response);
+  if (jsonText) {
+    return jsonText.trim();
+  }
 
-  throw new GeminiBriefError(message, 502, [
-    cleaned.slice(0, 900)
-  ]);
+  throw new GeminiBriefError("Gemini did not return any JSON.", 502);
+}
+
+function parseJsonOnly(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const cleaned = text
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const firstObject = cleaned.indexOf("{");
+      const lastObject = cleaned.lastIndexOf("}");
+      if (firstObject >= 0 && lastObject > firstObject) {
+        try {
+          return JSON.parse(cleaned.slice(firstObject, lastObject + 1));
+        } catch {
+          throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502);
+        }
+      }
+
+      throw new GeminiBriefError("Gemini returned text that was not valid JSON.", 502);
+    }
+  }
 }
 
 function validationIssues(validation: BriefValidationResult): string[] | undefined {
@@ -539,39 +457,14 @@ function isCredentialOrQuotaError(error: GeminiBriefError): boolean {
   );
 }
 
-function normaliseModelName(model: string): string {
-  return model.trim().replace(/^models\//, "");
-}
-
-function splitConfiguredFallbackModels(): string[] {
-  return (process.env.GEMINI_FALLBACK_MODELS || "")
-    .split(",")
-    .map((model) => model.trim())
-    .filter(Boolean);
-}
-
 function configuredModels(): string[] {
-  const primaryModel = normaliseModelName(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
-  const models = [primaryModel, ...splitConfiguredFallbackModels().map(normaliseModelName)].filter(
-    (model) => !UNAVAILABLE_GEMINI_MODELS.has(model)
+  return Array.from(
+    new Set(
+      [process.env.GEMINI_MODEL?.trim(), DEFAULT_GEMINI_MODEL, ...FALLBACK_GEMINI_MODELS].filter(
+        (model): model is string => Boolean(model)
+      )
+    )
   );
-
-  const uniqueModels = Array.from(new Set(models));
-  return uniqueModels.length > 0 ? uniqueModels : [DEFAULT_GEMINI_MODEL];
-}
-
-function configuredMaxOutputTokens(): number {
-  const rawValue = process.env.GEMINI_MAX_OUTPUT_TOKENS?.trim();
-  if (!rawValue) {
-    return DEFAULT_MAX_OUTPUT_TOKENS;
-  }
-
-  const parsedValue = Number(rawValue);
-  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
-    return DEFAULT_MAX_OUTPUT_TOKENS;
-  }
-
-  return Math.min(Math.floor(parsedValue), HARD_MAX_OUTPUT_TOKENS);
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -589,319 +482,31 @@ async function readJsonResponse(response: Response): Promise<unknown> {
   }
 }
 
-function retryDelayMs(attemptIndex: number): number {
-  return 500 * Math.pow(2, attemptIndex);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function postGeminiJson(
   endpoint: string,
   apiKey: string,
-  body: unknown,
-  maxAttempts = 3
+  body: unknown
 ): Promise<{ response: Response; payload: unknown }> {
-  let lastNetworkError: Error | null = null;
+  let response: Response;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify(body)
-      });
-      const payload = await readJsonResponse(response);
-
-      if (
-        response.ok ||
-        attempt === maxAttempts - 1 ||
-        !DEFAULT_RETRYABLE_STATUS_CODES.has(response.status)
-      ) {
-        return { response, payload };
-      }
-    } catch (error) {
-      lastNetworkError = error instanceof Error ? error : new Error("Network request failed.");
-      if (attempt === maxAttempts - 1) {
-        break;
-      }
-    }
-
-    await sleep(retryDelayMs(attempt));
-  }
-
-  throw new GeminiBriefError("Gemini API was unreachable or temporarily overloaded.", 502, [
-    lastNetworkError?.message || "The model returned repeated temporary capacity errors."
-  ]);
-}
-
-function asRecord(value: unknown): JsonObject {
-  return isJsonObject(value) ? value : {};
-}
-
-function asString(value: unknown): string {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-
-  return "";
-}
-
-function stringOrNull(value: unknown): string | null {
-  const text = asString(value);
-  if (!text) {
-    return null;
-  }
-
-  const lowered = text.toLowerCase();
-  if (["n/a", "na", "none", "null", "undefined", "not specified", "tbc", "tbd"].includes(lowered)) {
-    return null;
-  }
-
-  return text;
-}
-
-function strings(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      value
-        .map(asString)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    )
-  );
-}
-
-function parseNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  const text = asString(value).replace(/,/g, "");
-  const match = text.match(/-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function enumValue<T extends string>(
-  value: unknown,
-  allowed: readonly T[],
-  fallback: T | null = null
-): T | null {
-  const normalized = asString(value).toLowerCase().replace(/[\s-]+/g, "_");
-  const found = allowed.find((item) => item.toLowerCase() === normalized);
-  return found || fallback;
-}
-
-function platformValue(value: unknown): JDWCampaignBrief["campaign"]["platform"] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized.includes("meta") || normalized.includes("facebook") || normalized.includes("instagram")) {
-    return "Meta";
-  }
-  if (normalized.includes("tiktok") || normalized.includes("tik tok")) {
-    return "TikTok";
-  }
-  if (normalized.includes("youtube")) {
-    return "YouTube";
-  }
-  if (normalized.includes("other")) {
-    return "Other";
-  }
-  return null;
-}
-
-function currencyValue(value: unknown, fallbackText = ""): JDWCampaignBrief["budget"]["currency"] {
-  const normalized = `${asString(value)} ${fallbackText}`.toLowerCase();
-  if (normalized.includes("gbp") || normalized.includes("£")) return "GBP";
-  if (normalized.includes("eur") || normalized.includes("€")) return "EUR";
-  if (normalized.includes("usd") || normalized.includes("$")) return "USD";
-  if (normalized.includes("aud")) return "AUD";
-  if (normalized.includes("cad")) return "CAD";
-  if (normalized.includes("unknown")) return "unknown";
-  return null;
-}
-
-function budgetTypeValue(value: unknown): JDWCampaignBrief["budget"]["type"] {
-  const normalized = asString(value).toLowerCase().replace(/[\s-]+/g, "_");
-  if (normalized.includes("daily")) return "daily";
-  if (normalized.includes("lifetime")) return "lifetime";
-  if (normalized.includes("campaign_total") || normalized.includes("total")) return "campaign_total";
-  if (normalized.includes("ad_set")) return "ad_set_level";
-  if (normalized.includes("unknown")) return "unknown";
-  return null;
-}
-
-function adSetBudgetTypeValue(value: unknown): NonNullable<JDWCampaignBrief["ad_sets"][number]["budget_type"]> | null {
-  const normalized = budgetTypeValue(value);
-  return normalized === "ad_set_level" ? "unknown" : normalized;
-}
-
-function genderValue(value: unknown): JDWCampaignBrief["ad_sets"][number]["gender"] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized.includes("female") || normalized.includes("women")) return "female";
-  if (normalized.includes("male") || normalized.includes("men")) return "male";
-  if (normalized.includes("all") || normalized.includes("any")) return "all";
-  if (normalized.includes("unknown")) return "unknown";
-  return "unknown";
-}
-
-function targetingTypeValue(value: unknown): JDWCampaignBrief["ad_sets"][number]["targeting_type"] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized.includes("advantage")) return "advantage_plus";
-  if (normalized.includes("lookalike") || normalized.includes("lal")) return "lookalike";
-  if (normalized.includes("retarget") || normalized.includes("warm")) return "retargeting";
-  if (normalized.includes("interest") || normalized.includes("seed")) return "interest";
-  if (normalized.includes("broad")) return "broad";
-  if (normalized.includes("unknown")) return "unknown";
-  return "unknown";
-}
-
-function assetTypeValue(value: unknown): JDWCampaignBrief["ads"][number]["asset_type"] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized.includes("spark")) return "spark_ad";
-  if (normalized.includes("carousel")) return "carousel";
-  if (normalized.includes("image") || normalized.includes("photo") || normalized.includes("poster")) return "image";
-  if (normalized.includes("video") || normalized.includes("reel") || normalized.includes("tiktok")) return "video";
-  if (normalized.includes("unknown")) return "unknown";
-  return "unknown";
-}
-
-function compactAdToJdw(value: unknown): JDWCampaignBrief["ads"][number] {
-  const ad = asRecord(value);
-  return {
-    label: stringOrNull(ad.label),
-    release_title: stringOrNull(ad.release_title),
-    asset_type: assetTypeValue(ad.asset_type),
-    asset_links: strings(ad.asset_links),
-    post_url: stringOrNull(ad.post_url),
-    boost_code: stringOrNull(ad.boost_code),
-    destination_url: stringOrNull(ad.destination_url),
-    copy: stringOrNull(ad.copy),
-    notes: stringOrNull(ad.notes)
-  };
-}
-
-function compactAdSetToJdw(value: unknown): JDWCampaignBrief["ad_sets"][number] {
-  const adSet = asRecord(value);
-  return {
-    label: stringOrNull(adSet.label),
-    locations: strings(adSet.locations),
-    age_min: parseNumber(adSet.age_min),
-    age_max: parseNumber(adSet.age_max),
-    gender: genderValue(adSet.gender),
-    placements: strings(adSet.placements),
-    targeting_type: targetingTypeValue(adSet.targeting_type),
-    targeting_details: stringOrNull(adSet.targeting_details),
-    exclusions: stringOrNull(adSet.exclusions),
-    budget_amount: parseNumber(adSet.budget_amount),
-    budget_type: adSetBudgetTypeValue(adSet.budget_type),
-    notes: stringOrNull(adSet.notes),
-    ads: Array.isArray(adSet.ads) ? adSet.ads.map(compactAdToJdw) : []
-  };
-}
-
-function compactBriefToJdw(value: unknown): JDWCampaignBrief {
-  const brief = asRecord(value);
-  const budgetAmountText = asString(brief.budget_amount);
-
-  return {
-    brief_version: "JDW_CAMPAIGN_BRIEF_V1",
-    source: {
-      source_type: "quick_note",
-      source_title: "Gemini raw brief parser",
-      source_date: null,
-      original_item_label: null,
-      source_notes: []
-    },
-    build: {
-      action: "new_campaign",
-      existing_campaign_name: null,
-      approval_required: null,
-      launch_instruction: null,
-      priority: "normal"
-    },
-    campaign: {
-      artist: stringOrNull(brief.artist),
-      release_title: stringOrNull(brief.release_title),
-      acid: stringOrNull(brief.acid),
-      asid: stringOrNull(brief.asid),
-      platform: platformValue(brief.platform),
-      account: stringOrNull(brief.account),
-      objective: stringOrNull(brief.objective),
-      campaign_type: stringOrNull(brief.campaign_type),
-      conversion_location: stringOrNull(brief.conversion_location),
-      optimisation_event: stringOrNull(brief.optimisation_event),
-      pixel: stringOrNull(brief.pixel),
-      territory_summary: stringOrNull(brief.territory_summary),
-      start_date: stringOrNull(brief.start_date),
-      end_date: stringOrNull(brief.end_date),
-      campaign_notes: stringOrNull(brief.campaign_notes)
-    },
-    budget: {
-      type: budgetTypeValue(brief.budget_type),
-      amount: parseNumber(brief.budget_amount),
-      currency: currencyValue(brief.currency, budgetAmountText),
-      notes: stringOrNull(brief.budget_notes)
-    },
-    ad_sets: Array.isArray(brief.ad_sets) ? brief.ad_sets.map(compactAdSetToJdw) : [],
-    ads: Array.isArray(brief.ads) ? brief.ads.map(compactAdToJdw) : [],
-    special_notes: strings(brief.special_notes),
-    missing_required_fields: []
-  };
-}
-
-function compactPayloadToJdwPayload(value: unknown): unknown {
-  if (isGeneratedBriefObject(value)) {
-    return value;
-  }
-
-  const normalized = normaliseGeneratedJsonShape(value);
-  if (isGeneratedBriefObject(normalized)) {
-    return normalized;
-  }
-
-  if (!isJsonObject(normalized) || !Array.isArray(normalized.briefs)) {
-    return normalized;
-  }
-
-  const rawBriefs = normalized.briefs;
-  const allAlreadyFullBriefs = rawBriefs.length > 0 && rawBriefs.every(
-    (brief) => isJsonObject(brief) && brief.brief_version === "JDW_CAMPAIGN_BRIEF_V1"
-  );
-
-  if (allAlreadyFullBriefs) {
-    return rawBriefs.length === 1
-      ? rawBriefs[0]
-      : {
-          brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
-          briefs: rawBriefs
-        };
-  }
-
-  const briefs = rawBriefs.map(compactBriefToJdw);
-  if (briefs.length === 1) {
-    return briefs[0];
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    throw new GeminiBriefError("Gemini API was unreachable.", 502, [
+      error instanceof Error ? error.message : "Network request failed."
+    ]);
   }
 
   return {
-    brief_version: "JDW_CAMPAIGN_BRIEF_BATCH_V1",
-    briefs
+    response,
+    payload: await readJsonResponse(response)
   };
 }
 
@@ -909,131 +514,94 @@ async function generateWithInteractionsApi(
   apiKey: string,
   model: string,
   rawBrief: string
-): Promise<{ generated: unknown; usage?: GeminiUsageMetadata }> {
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions";
-  const body = {
-    model,
-    input: `Raw JDW brief:\n${rawBrief}`,
-    system_instruction: GEMINI_BRIEF_PROMPT,
-    store: false,
-    response_format: {
-      type: "text",
-      mime_type: "application/json",
-      schema: compactResponseJsonSchema
-    },
-    generation_config: {
-      temperature: 0,
-      top_p: 0.1,
-      thinking_level: "minimal",
-      max_output_tokens: configuredMaxOutputTokens()
+): Promise<unknown> {
+  const { response, payload } = await postGeminiJson(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    apiKey,
+    {
+      model,
+      input: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`,
+      store: false,
+      generation_config: {
+        temperature: 0.1,
+        top_p: 0.8,
+        candidate_count: 1,
+        max_output_tokens: MAX_OUTPUT_TOKENS,
+        thinking_level: "low"
+      },
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: briefResponseJsonSchema
+      }
     }
-  };
-
-  const { response, payload } = await postGeminiJson(endpoint, apiKey, body);
+  );
 
   if (!response.ok) {
-    const message =
-      response.status === 503
-        ? "Gemini is temporarily overloaded. Try the same brief again in a moment."
-        : "Gemini could not generate this brief.";
-
-    throw new GeminiBriefError(message, 502, [
+    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
       apiIssue("Interactions API", model, response, payload)
     ]);
   }
 
-  const typedPayload = payload as GeminiInteractionResponse;
-  const parsed = parseJsonOnly(
-    extractInteractionText(typedPayload),
-    typedPayload.status === "incomplete" ? "MAX_TOKENS" : undefined
-  );
-
-  return {
-    generated: compactPayloadToJdwPayload(parsed),
-    usage: interactionUsageToGeminiUsage(typedPayload.usage)
-  };
+  return parseJsonOnly(extractGeneratedJsonText(payload));
 }
 
 async function generateWithGenerateContentApi(
   apiKey: string,
   model: string,
   rawBrief: string
-): Promise<{ generated: unknown; usage?: GeminiUsageMetadata }> {
+): Promise<unknown> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent`;
 
   const body = {
-    systemInstruction: {
-      parts: [{ text: GEMINI_BRIEF_PROMPT }]
-    },
     contents: [
       {
         role: "user",
         parts: [
           {
-            text: rawBrief
+            text: `${GEMINI_BRIEF_PROMPT}\n\nRaw brief:\n${rawBrief}`
           }
         ]
       }
     ],
     generationConfig: {
-      temperature: 0,
-      topP: 0.1,
+      temperature: 0.1,
+      topP: 0.8,
       candidateCount: 1,
-      maxOutputTokens: configuredMaxOutputTokens(),
-      responseMimeType: "application/json",
-      responseSchema: compactResponseJsonSchema
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      responseMimeType: "application/json"
     }
   };
 
   const { response, payload } = await postGeminiJson(endpoint, apiKey, body);
 
   if (!response.ok) {
-    const message =
-      response.status === 503
-        ? "Gemini is temporarily overloaded. Try the same brief again in a moment."
-        : "Gemini could not generate this brief.";
-
-    throw new GeminiBriefError(message, 502, [
+    throw new GeminiBriefError("Gemini could not generate this brief.", 502, [
       apiIssue("generateContent API", model, response, payload)
     ]);
   }
 
-  const typedPayload = payload as GeminiGenerateContentResponse;
-  const candidate = typedPayload.candidates?.[0];
-  const parsed = parseJsonOnly(extractGenerateContentText(typedPayload), candidate?.finishReason);
-  return {
-    generated: compactPayloadToJdwPayload(parsed),
-    usage: typedPayload.usageMetadata
-  };
+  return parseJsonOnly(extractGenerateContentText(payload as GeminiGenerateContentResponse));
 }
 
-function validateGeneratedBrief(
-  generated: unknown,
-  usage?: GeminiUsageMetadata
-): GeminiBriefResult {
+function validateGeneratedBrief(generated: unknown): GeminiBriefResult {
   const rawGeneratedJson = JSON.stringify(generated);
   const validation = validateBriefJson(rawGeneratedJson);
 
   if (!validation.ok) {
-    throw new GeminiBriefError(validation.message, 422, validationIssues(validation));
+    throw new GeminiBriefError(
+      validation.message,
+      422,
+      validationIssues(validation)
+    );
   }
 
   return {
     payload: briefPayloadFromValidation(validation),
-    validation,
-    usage
+    validation
   };
-}
-
-function shouldTryNextModel(error: GeminiBriefError): boolean {
-  if (isCredentialOrQuotaError(error)) {
-    return false;
-  }
-
-  const detail = [error.message, ...(error.issues || [])].join(" ").toLowerCase();
-  return /404|not found|not supported|no longer available|not available/.test(detail);
 }
 
 export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBriefResult> {
@@ -1046,38 +614,31 @@ export async function generateGeminiBrief(rawBrief: string): Promise<GeminiBrief
 
   for (const model of configuredModels()) {
     try {
-      const result = await generateWithInteractionsApi(apiKey, model, rawBrief);
-      return validateGeneratedBrief(result.generated, result.usage);
+      return validateGeneratedBrief(await generateWithInteractionsApi(apiKey, model, rawBrief));
     } catch (error) {
       if (!(error instanceof GeminiBriefError)) {
         throw error;
       }
 
       lastError = error;
-      if (shouldTryNextModel(error)) {
-        continue;
+      if (isCredentialOrQuotaError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  for (const model of configuredModels()) {
+    try {
+      return validateGeneratedBrief(await generateWithGenerateContentApi(apiKey, model, rawBrief));
+    } catch (error) {
+      if (!(error instanceof GeminiBriefError)) {
+        throw error;
       }
 
-      // Only fall back to the legacy generateContent API when the Interactions
-      // endpoint/model itself is unavailable. Do not spend extra tokens trying
-      // to repair invalid JSON; the parsing error is returned immediately.
-      const detail = [error.message, ...(error.issues || [])].join(" ").toLowerCase();
-      if (/interactions api/.test(detail) && /404|not found|not supported|no longer available|not available/.test(detail)) {
-        try {
-          const legacyResult = await generateWithGenerateContentApi(apiKey, model, rawBrief);
-          return validateGeneratedBrief(legacyResult.generated, legacyResult.usage);
-        } catch (legacyError) {
-          if (legacyError instanceof GeminiBriefError) {
-            lastError = legacyError;
-            if (shouldTryNextModel(legacyError)) {
-              continue;
-            }
-          }
-          throw legacyError;
-        }
+      lastError = error;
+      if (isCredentialOrQuotaError(error)) {
+        throw error;
       }
-
-      throw error;
     }
   }
 
