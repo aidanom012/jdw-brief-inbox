@@ -218,17 +218,25 @@ export function StartBriefMenu({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
+  function closeMenu() {
+    setOpen(false);
+    setContinueOpen(false);
+  }
+
+  function startNewChoice() {
+    closeMenu();
+    router.push("/new");
+  }
+
   function startFresh() {
     window.localStorage.removeItem(AUTOSAVE_KEY);
     setOptions([]);
-    setOpen(false);
-    setContinueOpen(false);
+    closeMenu();
     router.push("/new?start=fresh");
   }
 
   function continueDraft(id: string) {
-    setOpen(false);
-    setContinueOpen(false);
+    closeMenu();
     router.push(`/new?resume=${encodeURIComponent(id)}`);
   }
 
@@ -254,9 +262,14 @@ export function StartBriefMenu({
 
       {open ? (
         <div className="start-brief-dropdown animate-pop">
+          <button type="button" className="start-brief-action start-brief-action-primary" onClick={startNewChoice}>
+            <span>New / AI import</span>
+            <small>paste notes</small>
+          </button>
+
           <button type="button" className="start-brief-action" onClick={startFresh}>
-            <span>New</span>
-            <small>blank brief</small>
+            <span>Blank manual brief</span>
+            <small>clear autosave</small>
           </button>
 
           <div className="start-brief-continue-block">
