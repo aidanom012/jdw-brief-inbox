@@ -7,9 +7,9 @@ type TopBarProps = {
 
 export function TopBar(_props: TopBarProps) {
   return (
-    <header className="sticky top-0 z-40 border-b-4 border-black bg-[#f4f1e4]/95">
+    <header className="sticky top-0 z-40 border-b-4 border-white bg-[#071013]/95 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <Link href="/inbox" className="focus-ring border-4 border-black bg-black px-3 py-2 font-mono text-lg font-black uppercase tracking-tight text-[#f4f1e4]">
+        <Link href="/inbox" className="focus-ring border-4 border-white bg-white px-3 py-2 font-mono text-lg font-black uppercase tracking-tight text-[#071013] transition duration-150 hover:bg-[#eb5160] hover:text-white">
           JDW Brief Builder
         </Link>
         <nav className="flex items-center gap-2 text-sm">

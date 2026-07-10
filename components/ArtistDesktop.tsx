@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { BriefRow } from "@/lib/db";
 import { DeleteArtistFolderButton } from "@/components/DeleteArtistFolderButton";
@@ -63,13 +64,17 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
         </div>
       ) : (
         <div className="desktop-grid">
-          {groups.map(([artist, artistBriefs]) => {
+          {groups.map(([artist, artistBriefs], index) => {
             const projects = uniqueProjects(artistBriefs);
             const draftCount = artistBriefs.filter((brief) => brief.status !== "done").length;
             const completedCount = artistBriefs.length - draftCount;
             const isCompletedFolder = artistBriefs.length > 0 && draftCount === 0;
             return (
-              <div key={artist} className={`folder-shell ${isCompletedFolder ? "folder-shell-completed" : ""}`}>
+              <div
+                key={artist}
+                className={`folder-shell ${isCompletedFolder ? "folder-shell-completed" : ""}`}
+                style={{ "--folder-delay": `${Math.min(index, 14) * 24}ms` } as CSSProperties}
+              >
                 <Link
                   href={`/inbox?artist=${encodeURIComponent(artist)}`}
                   className={`folder-card focus-ring ${isCompletedFolder ? "folder-card-completed" : ""}`}
