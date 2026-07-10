@@ -1,57 +1,41 @@
-# Build Notes
+# Groq strict JSON rebuild
 
-## Token-saving Gemini backend rework
+This build replaces the Gemini parser path with a Groq-first AI parser.
 
-This version changes the Gemini flow from “make Gemini output the whole app object” to “make Gemini output a compact extraction object, then let the backend build the full JDW brief locally.”
+## Main changes
 
-### What changed
+- Added `lib/ai-brief.ts`.
+- Added `/api/ai/brief`.
+- Kept `/api/gemini/brief` as a compatibility wrapper to `/api/ai/brief`.
+- Frontend now posts to `/api/ai/brief`.
+- UI wording now says Groq/AI instead of Gemini.
+- Manual builder remains primary and the AI helper stays below the manual input section.
 
-- Default Gemini model remains `gemini-3.5-flash`.
-- Gemini now returns a compact shape only:
-  - `briefs[]`
-  - campaign fields
-  - budget fields
-  - ad sets
-  - nested ads
-  - top-level ads
-  - special notes
-- The backend converts that compact output into the full `JDW_CAMPAIGN_BRIEF_V1` app schema locally.
-- Gemini no longer has to generate repeated boilerplate fields like `source`, `build`, `brief_version`, or `missing_required_fields`.
-- Missing fields are still computed locally by the existing validation/checklist logic.
-- Multiple campaign setups are still supported in one request: Gemini returns multiple items in `briefs[]`, then the backend returns `JDW_CAMPAIGN_BRIEF_BATCH_V1` when there is more than one.
-- JSON schema control is now sent through `generationConfig.responseSchema` with `responseMimeType: "application/json"`.
-- JSON parse failures no longer trigger another model call. The backend tries local parsing/extraction only, then errors cleanly if the response is still unusable.
-- Fallback models are only attempted for model availability problems like 404 / no longer available, not for invalid JSON or validation issues.
-- The API response now includes Gemini token usage when Google returns it.
-- The `/new` Gemini panel shows token usage after a successful generation.
+## Provider/config
 
-### Why this should use fewer tokens
+Use these environment variables:
 
-The old approach made Gemini output the entire full app JSON object, including fields the backend can safely fill itself. That created a larger output and more chances for broken JSON.
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MAX_COMPLETION_TOKENS=2048
+```
 
-The new approach keeps Gemini focused on extraction only. The backend handles normalisation, defaults, enum cleanup, budget number parsing, currency detection, and final Zod validation.
+Do not use `NEXT_PUBLIC_GROQ_API_KEY`.
 
-### Tests
+## Backend behaviour
+
+- One AI call per click.
+- No AI repair calls.
+- Uses Groq's OpenAI-compatible Chat Completions endpoint.
+- Uses Structured Outputs with `response_format.type = "json_schema"` and `strict: true`.
+- Asks Groq for a compact extraction object only.
+- Backend expands compact output into `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` locally.
+- Multiple briefs are still supported in one request.
+- Local regex extraction pre-detects ACID, ASID, URLs, boost codes, and budget hints before the model call.
+
+## Testing
 
 - `npm run typecheck` passed.
-- `npm run build` passed.
-
-## Important
-
-The app still does not auto-save Gemini output. The user reviews/edits the generated brief before clicking the normal save button.
-
-
-## Follow-up hardening
-
-- The Gemini panel now renders below the manual build section.
-- The prompt explicitly forbids the full JDW app schema and asks only for the compact `briefs[]` extraction object.
-- The parser now accepts complete `JDW_CAMPAIGN_BRIEF_V1` and `JDW_CAMPAIGN_BRIEF_BATCH_V1` responses if Gemini returns the older/full shape anyway.
-- If Gemini returns JSON-looking text that is incomplete/truncated, the backend reports it as cut off instead of making another Gemini call.
-
-
-## Emergency JSON hardening
-
-- Switched primary Gemini call from legacy generateContent to Interactions API.
-- Uses response_format application/json schema, store:false, and minimal thinking.
-- Keeps one-call behaviour for JSON failures; no repair calls.
-- Moved Gemini panel below the manual builder input area.
+- `npm run build` compiled and generated pages successfully.

@@ -16,7 +16,7 @@ import {
   type JDWCampaignBrief,
 } from "@/lib/brief-schema";
 import { BriefFunnelView } from "@/components/BriefFunnelView";
-import { GeminiBriefPanel } from "@/components/GeminiBriefPanel";
+import { AiBriefPanel } from "@/components/AiBriefPanel";
 
 const MAX_JSON_FILE_LENGTH = 250_000;
 const AUTOSAVE_KEY = "jdw.manualBriefDraft.v2";
@@ -714,7 +714,7 @@ const BUILD_MANUAL_ITEMS = [
   {
     step: "Import",
     title: "Paste James talk",
-    body: "Drop the raw message, email, brief, links, or notes into Gemini."
+    body: "Drop the raw message, email, brief, links, or notes into Groq."
   },
   {
     step: "Check",
@@ -2051,7 +2051,7 @@ export function NewBriefForm({
       </div>
 
       {!briefId ? (
-        <GeminiBriefPanel
+        <AiBriefPanel
           onGenerated={(json, validation, message) =>
             applyValidatedJson(json, validation, message)
           }

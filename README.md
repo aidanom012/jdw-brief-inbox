@@ -1,73 +1,66 @@
-# JDW Brief Builder
+# JDW Brief Inbox
 
-Soft Finder Desktop style pass for the JDW swipe/funnel brief builder.
+Private Next.js app for turning messy JDW / James Walker campaign notes into structured campaign briefs, ad sets, ads, validation state, and build checklists.
 
-## Gemini Brief Parser
+## AI brief parser
 
-The `/new` flow is now an AI-assisted build studio. Use the manual builder as the main flow. The **James Talk Import** Gemini helper now sits below the manual section; paste messy James-style messages there only when you want AI to structure the brief before review/save.
+The `/new` page keeps the manual builder as the primary workflow. The **James Talk Import** AI helper sits below the manual section.
 
-The Gemini API key is server-only. Set these locally and in Vercel:
-
-```env
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_MAX_OUTPUT_TOKENS=4096
-```
-
-The frontend calls `/api/gemini/brief` with only the pasted raw brief. The backend calls Gemini with structured JSON output, validates the result against the existing JDW schema, and returns validated campaign data. No Supabase data, saved briefs, or unrelated user data are sent to Gemini.
-
-A 503 response means Gemini is temporarily overloaded or out of capacity. The app retries short temporary 503 failures automatically, then shows a clear retry message if Gemini is still overloaded.
-
-Optional fallback models can be supplied as a comma-separated list, but keep this blank for normal use:
+This build uses **Groq** as the primary AI provider:
 
 ```env
-GEMINI_FALLBACK_MODELS=
+AI_PROVIDER=groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 
-See `GEMINI_SETUP.md` for setup and key-rotation notes.
+The frontend sends only the pasted raw brief to `/api/ai/brief`. The backend calls Groq server-side using Structured Outputs with a strict JSON schema. Groq returns a compact extraction object, and the backend expands it locally into the full `JDW_CAMPAIGN_BRIEF_V1` or `JDW_CAMPAIGN_BRIEF_BATCH_V1` shape.
 
-## Local Login
+The old `/api/gemini/brief` route remains only as a compatibility wrapper to `/api/ai/brief` so older UI calls do not break during deploys.
 
-Set one of these in `.env.local` for the private passcode:
+No AI output is saved automatically. The generated brief is loaded into the builder for review/editing first.
+
+## Setup
+
+Create a Supabase project and run the migration in `supabase/migrations` if present.
+
+Add environment variables:
 
 ```env
-APP_PASSCODE=your_private_passcode
+AIDAN_PASSCODE=
+JAMES_PASSCODE=
+NEXT_PUBLIC_APP_NAME=JDW Brief Inbox
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SESSION_SECRET=
+AI_PROVIDER=groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_MAX_COMPLETION_TOKENS=2048
 ```
 
-If no passcode env var is configured, local development only accepts `local-jdw`. Production never uses this fallback.
-## 503 / high demand errors
+Install and run:
 
-A 503 response means Gemini is temporarily overloaded or out of capacity. It is not the same as a bad key or a validation failure. The app now retries short temporary 503 failures automatically, then shows a clear retry message if Gemini is still overloaded.
-
-Optional fallback models can be supplied as a comma-separated list, but keep this blank for normal low-cost use:
-
-```env
-GEMINI_FALLBACK_MODELS=
+```bash
+npm install
+npm run dev
 ```
 
+Build checks:
 
-
-## Gemini brief parser
-
-The `/new` page includes a Gemini parser for pasting messy James-style notes into the brief builder. The API key is server-only and read from `GEMINI_API_KEY`; never expose it with `NEXT_PUBLIC_`.
-
-Current backend flow:
-
-1. Frontend sends only the raw pasted brief to `app/api/gemini/brief/route.ts`.
-2. Gemini is instructed to return a compact extraction object with `briefs[]`. The backend can also accept the older full JDW brief shape if Gemini returns it anyway.
-3. `lib/gemini-brief.ts` converts compact output into the full app schema locally, or validates a complete JDW brief/batch directly.
-4. Existing Zod validation/checklist logic validates the generated brief.
-5. The UI loads the brief for review; it does not auto-save.
-
-This supports multiple campaign setups in one paste. Multiple generated briefs appear as selectable buttons in the UI.
-
-Environment variables:
-
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_MAX_OUTPUT_TOKENS=4096
-GEMINI_FALLBACK_MODELS=
+```bash
+npm run typecheck
+npm run build
 ```
 
-Leave `GEMINI_FALLBACK_MODELS` blank for normal use. Invalid JSON/validation errors do not trigger another model call. Cut-off JSON is reported clearly so tokens are not wasted on repair attempts.
+## Routes
+
+- `/login`: private passcode login.
+- `/inbox`: brief inbox.
+- `/new`: manual builder plus Groq AI helper below it.
+- `/brief/[id]`: structured brief, missing fields, naming, checklist, notes, and raw JSON.
+
+## Important
+
+Never expose AI API keys in frontend code. Do not use `NEXT_PUBLIC_GROQ_API_KEY`.

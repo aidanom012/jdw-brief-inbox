@@ -23,10 +23,10 @@ export default async function NewBriefPage() {
         <div className="build-hero mb-6 animate-rise">
           <p className="pixel-label">JDW build studio</p>
           <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-            Manual build first. AI helper underneath.
+            Manual build first. Groq helper underneath.
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 pixel-muted">
-            Build manually as normal, or use the Gemini helper below the manual section to structure messy James notes before reviewing and saving.
+            Build manually as normal, or use the Groq helper below the manual section to structure messy James notes before reviewing and saving.
           </p>
         </div>
         <NewBriefForm savedArtists={savedArtists} savedProjects={savedProjects} />
