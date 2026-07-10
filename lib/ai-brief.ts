@@ -123,7 +123,7 @@ export class AiBriefError extends Error {
 }
 
 const AI_BRIEF_SYSTEM_PROMPT = `You extract paid-social campaign brief details from messy JDW / James Walker notes.
-You are in JSON mode. Return one valid JSON object only. No markdown. No prose. No comments.
+Return exactly one valid JSON object only. The first character must be { and the last character must be }. No markdown. No prose. No comments.
 Never output brief_version, source, build, missing_required_fields, or the full JDW app schema.
 Return only this compact object shape: {"briefs":[{"artist":"","release_title":"","platform":"","account":"","acid":"","asid":"","objective":"","campaign_type":"","conversion_location":"","optimisation_event":"","pixel":"","budget_type":"","budget_amount":"","currency":"","start_date":"","end_date":"","territory_summary":"","campaign_notes":"","ad_sets":[{"label":"","locations":[],"age_min":"","age_max":"","gender":"","placements":[],"budget_amount":"","budget_type":"","targeting_type":"","targeting_details":"","exclusions":"","notes":"","ads":[{"label":"","release_title":"","asset_type":"","asset_links":[],"post_url":"","boost_code":"","destination_url":"","copy":"","notes":""}]}],"ads":[],"special_notes":[]}]}
 Use empty strings for unknown scalar values and empty arrays for unknown lists. Keep output compact.
@@ -486,6 +486,26 @@ function parseJsonStrict(text: string, finishReason?: string | null): unknown {
     return JSON.parse(text);
   } catch {
     const cleaned = text.trim();
+
+    const fencedJson = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+    if (fencedJson) {
+      try {
+        return JSON.parse(fencedJson);
+      } catch {
+        // Fall through to the object extraction below.
+      }
+    }
+
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+      } catch {
+        // Fall through to the user-facing parser error.
+      }
+    }
+
     const message = finishReason === "length"
       ? "Groq returned JSON but it was cut off before it completed. Raise GROQ_MAX_COMPLETION_TOKENS or shorten the pasted brief."
       : "Groq returned a response that could not be parsed as JSON.";
@@ -509,11 +529,37 @@ function configuredMaxCompletionTokens(): number {
   return Math.min(Math.floor(parsedValue), HARD_MAX_COMPLETION_TOKENS);
 }
 
-function groqResponseFormat(): JsonObject {
-  // Force JSON-object mode in code. Do not let old Vercel env vars put the app
-  // back into strict json_schema mode, because that was causing Groq 400
-  // failed_generation errors before the app received usable JSON.
-  return { type: "json_object" };
+function shouldRetryWithoutGroqJsonMode(response: Response, payload: unknown): boolean {
+  if (response.status !== 400 || !isJsonObject(payload)) return false;
+  const error = isJsonObject(payload.error) ? payload.error : payload;
+  const text = [
+    error.message,
+    error.type,
+    error.code,
+    error.failed_generation,
+    payload.failed_generation
+  ]
+    .map((value) => (typeof value === "string" ? value : ""))
+    .join(" ")
+    .toLowerCase();
+
+  return text.includes("failed_generation") || text.includes("validate json") || text.includes("json");
+}
+
+function groqRequestBody(model: string, rawBrief: string, facts: ReturnType<typeof localFacts>, useJsonMode: boolean): JsonObject {
+  return {
+    model,
+    temperature: 0,
+    messages: [
+      { role: "system", content: AI_BRIEF_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Local deterministic hints, do not ignore exact matches:\n${JSON.stringify(facts)}\n\nRaw JDW brief:\n${rawBrief}`
+      }
+    ],
+    max_completion_tokens: configuredMaxCompletionTokens(),
+    ...(useJsonMode ? { response_format: { type: "json_object" } } : {})
+  };
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -551,6 +597,22 @@ function groqUsageToAiUsage(usage: GroqChatCompletionResponse["usage"] | undefin
   };
 }
 
+async function postGroqChatCompletion(apiKey: string, body: JsonObject): Promise<{ response: Response; payload: unknown }> {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  return {
+    response,
+    payload: await readJsonResponse(response)
+  };
+}
+
 async function generateWithGroq(rawBrief: string): Promise<{ generated: unknown; usage?: AiUsageMetadata; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -559,28 +621,17 @@ async function generateWithGroq(rawBrief: string): Promise<{ generated: unknown;
 
   const model = configuredGroqModel();
   const facts = localFacts(rawBrief);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      messages: [
-        { role: "system", content: AI_BRIEF_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Local deterministic hints, do not ignore exact matches:\n${JSON.stringify(facts)}\n\nRaw JDW brief:\n${rawBrief}`
-        }
-      ],
-      max_completion_tokens: configuredMaxCompletionTokens(),
-      response_format: groqResponseFormat()
-    })
-  });
+  let { response, payload } = await postGroqChatCompletion(
+    apiKey,
+    groqRequestBody(model, rawBrief, facts, true)
+  );
 
-  const payload = await readJsonResponse(response);
+  if (!response.ok && shouldRetryWithoutGroqJsonMode(response, payload)) {
+    ({ response, payload } = await postGroqChatCompletion(
+      apiKey,
+      groqRequestBody(model, rawBrief, facts, false)
+    ));
+  }
 
   if (!response.ok) {
     const issue = apiIssue("Groq Chat Completions API", model, response, payload);
@@ -635,4 +686,3 @@ export async function generateAiBrief(rawBrief: string): Promise<AiBriefResult> 
   const result = await generateWithGroq(rawBrief);
   return validateGeneratedBrief(result.generated, result.usage, "groq", result.model);
 }
-

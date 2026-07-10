@@ -36,7 +36,7 @@ Then redeploy.
 
 ## Important production note
 
-The backend now forces Groq `json_object` mode in code. Old Vercel values like `GROQ_RESPONSE_FORMAT=json_schema` will be ignored so the app cannot fall back into the 400 `failed_generation` loop.
+The backend first asks Groq for JSON mode, then automatically retries without Groq-enforced JSON mode if Groq rejects its own generation with a 400 `failed_generation` / JSON validation error. The app still validates the returned JSON itself before loading anything into the builder.
 
 ## What changed
 
