@@ -3,6 +3,7 @@ import Link from "next/link";
 import { StartBriefMenu } from "@/components/StartBriefMenu";
 import type { BriefRow } from "@/lib/db";
 import { DeleteArtistFolderButton } from "@/components/DeleteArtistFolderButton";
+import ArtistCabinet3D from "@/components/ArtistCabinet3D.client";
 
 function folderName(value: string | null | undefined): string {
   const clean = value?.trim();
@@ -28,6 +29,20 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
     }, new Map<string, BriefRow[]>())
   ).sort(([a], [b]) => a.localeCompare(b));
 
+  const cabinetArtists = groups.map(([artist, artistBriefs]) => {
+    const projects = uniqueProjects(artistBriefs);
+    const draftCount = artistBriefs.filter((brief) => brief.status !== "done").length;
+    const completedCount = artistBriefs.length - draftCount;
+    return {
+      name: artist,
+      href: `/inbox?artist=${encodeURIComponent(artist)}`,
+      briefCount: artistBriefs.length,
+      draftCount,
+      completedCount,
+      projectPreview: projects.slice(0, 1).join(" / ") || undefined,
+    };
+  });
+
   return (
     <section className="desktop-screen animate-rise">
       <div className="desktop-titlebar" aria-hidden="true">
@@ -46,6 +61,8 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
         </div>
         <StartBriefMenu label="+ Start new brief" variant="desktop" />
       </div>
+
+      {groups.length > 0 ? <ArtistCabinet3D artists={cabinetArtists} /> : null}
 
       {groups.length === 0 ? (
         <div className="empty-desktop-panel">

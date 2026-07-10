@@ -4926,3 +4926,181 @@ main:has(.builder-console) {
     min-width: 0;
   }
 }
+
+/* React Three Fiber artist filing cabinet */
+.artist-cabinet-panel {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 0.42fr) minmax(360px, 1fr) !important;
+  gap: clamp(1rem, 2.5vw, 2rem) !important;
+  align-items: stretch !important;
+  margin: -1.2rem 0 clamp(3.2rem, 5vw, 5.25rem) !important;
+  padding: clamp(1rem, 2.2vw, 1.45rem) !important;
+  border: 2px solid rgba(8,9,10,.12) !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,.035) 1px, transparent 1.3px),
+    linear-gradient(135deg, rgba(255,255,255,.98), rgba(248,249,251,.95)) !important;
+  background-size: 18px 18px, auto !important;
+  box-shadow: 0 28px 70px rgba(0,0,0,.13), 0 1px 0 rgba(255,255,255,.9) inset !important;
+  color: #08090a !important;
+}
+
+.artist-cabinet-copy {
+  display: flex !important;
+  min-height: 390px !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  border: 2px solid #08090a !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+  padding: clamp(1rem, 2vw, 1.35rem) !important;
+}
+
+.artist-cabinet-copy h2 {
+  margin-top: .8rem !important;
+  max-width: 360px !important;
+  font-size: clamp(2.15rem, 4.3vw, 4.7rem) !important;
+  font-weight: 950 !important;
+  line-height: .88 !important;
+  letter-spacing: -.065em !important;
+}
+
+.artist-cabinet-copy p:not(.pixel-label) {
+  max-width: 360px !important;
+  color: rgba(8,9,10,.68) !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+  line-height: 1.55 !important;
+}
+
+.artist-cabinet-copy::after {
+  content: "artist drawers / webgl";
+  display: inline-flex !important;
+  width: fit-content !important;
+  border: 2px solid #08090a !important;
+  border-radius: 999px !important;
+  background: #08090a !important;
+  color: #ffffff !important;
+  padding: .55rem .75rem !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .65rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+.artist-cabinet-frame {
+  position: relative !important;
+  height: clamp(390px, 34vw, 520px) !important;
+  min-height: 390px !important;
+  overflow: hidden !important;
+  border: 2px solid #08090a !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255,255,255,.98), rgba(239,242,247,.82) 46%, rgba(230,235,242,.98)),
+    #f7f8fb !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.86), inset 0 -26px 60px rgba(8,9,10,.08) !important;
+}
+
+.artist-cabinet-frame canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none !important;
+}
+
+.artist-cabinet-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(8,9,10,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(8,9,10,.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(circle at 50% 45%, transparent 15%, black 78%);
+}
+
+.cabinet-drawer-label {
+  display: grid !important;
+  min-width: 158px !important;
+  max-width: 210px !important;
+  gap: .22rem !important;
+  border: 2px solid #08090a !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.94) !important;
+  color: #08090a !important;
+  padding: .5rem .58rem !important;
+  text-align: center !important;
+  box-shadow: 0 12px 22px rgba(8,9,10,.16) !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  transform: translateZ(0) !important;
+}
+
+.cabinet-drawer-label:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.cabinet-drawer-name {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: .86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -.02em !important;
+}
+
+.cabinet-drawer-meta,
+.cabinet-drawer-project {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: rgba(8,9,10,.58) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .52rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+}
+
+.cabinet-caption {
+  border: 2px solid rgba(8,9,10,.15) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.9) !important;
+  color: rgba(8,9,10,.68) !important;
+  padding: .45rem .72rem !important;
+  white-space: nowrap !important;
+  box-shadow: 0 10px 24px rgba(8,9,10,.12) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: .62rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+@media (max-width: 1100px) {
+  .artist-cabinet-panel {
+    grid-template-columns: 1fr !important;
+  }
+
+  .artist-cabinet-copy {
+    min-height: 0 !important;
+    display: grid !important;
+    gap: 1rem !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .artist-cabinet-panel {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artist-cabinet-panel {
+    display: none !important;
+  }
+}
