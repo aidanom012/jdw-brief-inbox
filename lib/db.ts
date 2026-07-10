@@ -230,3 +230,13 @@ export async function deleteBrief(id: string): Promise<void> {
     throw error;
   }
 }
+
+export async function deleteBriefsByArtist(artist: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const cleanArtist = artist.trim();
+  const { error } = await supabase.from("briefs").delete().eq("artist", cleanArtist);
+
+  if (error) {
+    throw error;
+  }
+}

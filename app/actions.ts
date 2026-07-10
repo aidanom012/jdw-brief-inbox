@@ -7,6 +7,7 @@ import { validateBriefJson } from "@/lib/brief-schema";
 import {
   createBrief,
   deleteBrief,
+  deleteBriefsByArtist,
   updateBrief,
   updateBriefStatus,
   updateChecklistItem,
@@ -173,6 +174,30 @@ export async function updateInternalNotesAction(briefId: string, internalNotes: 
 
   await updateInternalNotes(briefId, internalNotes);
   revalidatePath(`/brief/${briefId}`);
+}
+
+
+export async function deleteBriefFromListAction(briefId: string): Promise<void> {
+  assertSameOriginRequest();
+  requireUser();
+  assertUuid(briefId);
+  await deleteBrief(briefId);
+  revalidatePath("/");
+  revalidatePath("/inbox");
+}
+
+export async function deleteArtistFolderAction(artist: string): Promise<void> {
+  assertSameOriginRequest();
+  requireUser();
+  const cleanArtist = artist.trim();
+
+  if (!cleanArtist || cleanArtist.length > 160) {
+    throw new Error("Invalid artist folder.");
+  }
+
+  await deleteBriefsByArtist(cleanArtist);
+  revalidatePath("/");
+  revalidatePath("/inbox");
 }
 
 export async function deleteBriefAction(briefId: string): Promise<void> {

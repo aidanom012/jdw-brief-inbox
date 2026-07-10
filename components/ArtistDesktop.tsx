@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { BriefRow } from "@/lib/db";
+import { DeleteArtistFolderButton } from "@/components/DeleteArtistFolderButton";
 
 function folderName(value: string | null | undefined): string {
   const clean = value?.trim();
@@ -65,26 +66,30 @@ export function ArtistDesktop({ briefs }: { briefs: BriefRow[] }) {
           {groups.map(([artist, artistBriefs]) => {
             const projects = uniqueProjects(artistBriefs);
             const draftCount = artistBriefs.filter((brief) => brief.status !== "done").length;
+            const completedCount = artistBriefs.length - draftCount;
+            const isCompletedFolder = artistBriefs.length > 0 && draftCount === 0;
             return (
-              <Link
-                key={artist}
-                href={`/inbox?artist=${encodeURIComponent(artist)}`}
-                className="folder-card focus-ring"
-              >
-                <span className="folder-icon" aria-hidden="true">
-                  <span />
-                </span>
-                <span className="mt-3 block text-xl font-black leading-tight">{artist}</span>
-                <span className="mt-2 block font-mono text-xs font-black uppercase tracking-[0.12em] pixel-muted">
-                  {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"} · {draftCount} draft
-                </span>
-                <span className="mt-3 block truncate text-sm font-bold pixel-muted">
-                  {projects.length ? projects.slice(0, 3).join(" / ") : "No project name yet"}
-                </span>
-                <span className="mt-4 inline-block border-2 border-black px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.12em]">
-                  updated {updatedLabel(artistBriefs)}
-                </span>
-              </Link>
+              <div key={artist} className={`folder-shell ${isCompletedFolder ? "folder-shell-completed" : ""}`}>
+                <Link
+                  href={`/inbox?artist=${encodeURIComponent(artist)}`}
+                  className={`folder-card focus-ring ${isCompletedFolder ? "folder-card-completed" : ""}`}
+                >
+                  <span className="folder-icon" aria-hidden="true">
+                    <span />
+                  </span>
+                  <span className="mt-3 block text-xl font-black leading-tight folder-title-text">{artist}</span>
+                  <span className="mt-2 block font-mono text-xs font-black uppercase tracking-[0.12em] pixel-muted">
+                    {artistBriefs.length} brief{artistBriefs.length === 1 ? "" : "s"} · {draftCount} draft · {completedCount} completed
+                  </span>
+                  <span className="mt-3 block truncate text-sm font-bold pixel-muted folder-project-text">
+                    {projects.length ? projects.slice(0, 3).join(" / ") : "No project name yet"}
+                  </span>
+                  <span className="mt-4 inline-block border-2 border-black px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.12em]">
+                    {isCompletedFolder ? "completed" : `updated ${updatedLabel(artistBriefs)}`}
+                  </span>
+                </Link>
+                <DeleteArtistFolderButton artist={artist} count={artistBriefs.length} />
+              </div>
             );
           })}
         </div>

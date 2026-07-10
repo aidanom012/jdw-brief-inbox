@@ -10,6 +10,8 @@
   --line: #060606;
   --accent: #eb5160;
   --accent-soft: #ffd9de;
+  --done: #22c55e;
+  --done-soft: #dcfce7;
 }
 
 * { box-sizing: border-box; }
@@ -357,4 +359,49 @@ button, input, select, textarea { font: inherit; }
   .wizard-controls { position: static; flex-wrap: wrap; }
   .simple-question { min-height: 360px; }
   .swipe-card { min-height: 430px; }
+}
+
+
+/* Visible delete + completed states */
+.folder-shell { position: relative; min-height: 230px; }
+.folder-shell .folder-card { height: 100%; }
+.folder-delete {
+  position: absolute;
+  top: .55rem;
+  right: .55rem;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 950;
+  transition: transform .12s ease, background-color .12s ease, color .12s ease;
+}
+.folder-delete:hover { transform: translate(-2px, -2px); background: var(--accent); color: var(--paper); }
+.folder-card-completed,
+.campaign-card-completed { background: var(--done-soft); }
+.folder-card-completed .folder-icon,
+.folder-card-completed .folder-icon::before { background: var(--done); }
+.folder-card-completed .folder-title-text,
+.folder-card-completed .folder-project-text,
+.campaign-card-completed .campaign-title-text,
+.campaign-card-completed .campaign-project-text { text-decoration: line-through; text-decoration-thickness: 3px; }
+.completed-chip { background: var(--done); color: var(--paper); }
+.campaign-card-completed::after {
+  content: "COMPLETED";
+  position: absolute;
+  top: 46px;
+  right: 18px;
+  border: 3px solid var(--ink);
+  background: var(--done);
+  color: var(--paper);
+  padding: .25rem .45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .12em;
 }
